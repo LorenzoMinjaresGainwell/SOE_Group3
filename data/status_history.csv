@@ -1,0 +1,3 @@
+opportunity_id,from_status,to_status,changed_at,changed_by,note
+opp-001,Detected,Unreviewed,2026-07-02T11:15:00Z,System,Opportunity extracted from monitored source.
+opp-002,Unreviewed,Monitor,2026-07-02T12:00:00Z,Prototype User,Waiting for partner eligibility confirmation.

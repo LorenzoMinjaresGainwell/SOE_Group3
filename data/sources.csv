@@ -1,0 +1,4 @@
+id,state,name,type,url,last_checked_at,status,opportunities_found
+src-001,Texas,Texas Procurement Portal,Procurement portal,https://example.com/texas-procurement,2026-07-02T10:30:00Z,Healthy,8
+src-002,Montana,Montana Office of Rural Health,Rural health office,https://example.com/montana-rural-health,2026-07-02T09:10:00Z,Healthy,3
+src-003,North Carolina,NC Medicaid Procurement,Medicaid site,https://example.com/nc-medicaid-procurement,2026-07-02T08:00:00Z,Needs review,4

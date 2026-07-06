@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rural Health Opportunity Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Local CSV proof of concept</p>
+        <h1>Rural Health Opportunity Dashboard</h1>
+      </div>
+      <button id="refreshButton" type="button">Refresh sources</button>
+    </header>
+
+    <main>
+      <section class="metrics" id="metrics"></section>
+
+      <section class="toolbar" aria-label="Opportunity filters">
+        <label>
+          Search
+          <input id="searchInput" type="search" placeholder="Title, state, agency, keyword">
+        </label>
+        <label>
+          Status
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+            <option>Pursue</option>
+            <option>Monitor</option>
+            <option>Decline</option>
+            <option>Unreviewed</option>
+          </select>
+        </label>
+        <label>
+          Minimum fit
+          <input id="scoreFilter" type="number" min="0" max="100" value="0">
+        </label>
+      </section>
+
+      <section class="workspace">
+        <section class="panel table-panel">
+          <div class="panel-heading">
+            <h2>Opportunities</h2>
+            <span id="resultCount"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Opportunity</th>
+                  <th>State</th>
+                  <th>Due</th>
+                  <th>Fit</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="opportunityRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="panel detail-panel" id="detailPanel">
+          <p class="muted">Select an opportunity to review details.</p>
+        </aside>
+      </section>
+
+      <section class="lower-grid">
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Monitored sources</h2>
+          </div>
+          <div id="sourcesList" class="stack-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-heading">
+            <h2>Scoring model</h2>
+          </div>
+          <div id="rulesList" class="stack-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
