@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Rural Health Opportunity Dashboard</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=20260723-2">
   </head>
   <body>
     <header class="topbar">
@@ -17,6 +17,8 @@
 
     <main>
       <section class="metrics" id="metrics"></section>
+
+      <nav class="category-tabs" id="categoryTabs" aria-label="Opportunity source categories"></nav>
 
       <section class="toolbar" aria-label="Opportunity filters">
         <label>
@@ -50,6 +52,7 @@
               <thead>
                 <tr>
                   <th>Opportunity</th>
+                  <th>Category</th>
                   <th>State</th>
                   <th>Due</th>
                   <th>Fit</th>
@@ -83,6 +86,6 @@
       </section>
     </main>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=20260723-2"></script>
   </body>
 </html>
