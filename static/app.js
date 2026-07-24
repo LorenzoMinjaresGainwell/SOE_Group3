@@ -24,12 +24,12 @@ const els = {
   score: document.querySelector("#scoreFilter"),
   sources: document.querySelector("#sourcesList"),
   rules: document.querySelector("#rulesList"),
-  refresh: document.querySelector("#refreshButton"),
   tabs: document.querySelector("#categoryTabs"),
 };
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -292,23 +292,6 @@ async function renderSourcesAndRules() {
   `).join("");
 }
 
-async function refreshSources() {
-  els.refresh.disabled = true;
-  els.refresh.textContent = "Checking...";
-  try {
-    const result = await api("/api/refresh", { method: "POST", body: "{}" });
-    state.opportunities = await api("/api/opportunities");
-    renderCategoryTabs();
-    renderMetrics();
-    renderTable();
-    await renderSourcesAndRules();
-    alert(result.message);
-  } finally {
-    els.refresh.disabled = false;
-    els.refresh.textContent = "Refresh sources";
-  }
-}
-
 async function init() {
   state.opportunities = await api("/api/opportunities");
   state.selectedId = state.opportunities[0]?.id || null;
@@ -348,7 +331,6 @@ function renderFilteredView() {
 els.search.addEventListener("input", renderFilteredView);
 els.score.addEventListener("input", renderFilteredView);
 els.status.addEventListener("change", renderFilteredView);
-els.refresh.addEventListener("click", refreshSources);
 
 init().catch((error) => {
   document.body.innerHTML = `<main><section class="panel"><h1>Unable to load dashboard</h1><p>${escapeHtml(error.message)}</p></section></main>`;

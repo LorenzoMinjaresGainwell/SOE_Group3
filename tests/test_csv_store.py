@@ -76,6 +76,39 @@ class CsvStoreCategoryTests(unittest.TestCase):
         self.assertIn("competitor_signals", record["categories"])
         self.assertNotIn("contract_expirations", record["categories"])
 
+    def test_separates_informational_federal_records_from_opportunities(self):
+        self.write_csv("opportunities.csv", [
+            {
+                "id": "sam-1", "title": "Federal RFP", "state": "Federal",
+                "agency": "CMS", "source": "SAM.gov Opportunities API",
+                "document_type": "Solicitation", "fit_score": "80",
+                "budget_estimate": "100", "program_focus": "",
+                "keywords_matched": "", "risks": "",
+            },
+            {
+                "id": "register-1", "title": "Proposed policy", "state": "Federal",
+                "agency": "CMS", "source": "Federal Register API",
+                "document_type": "Proposed Rule", "fit_score": "65",
+                "budget_estimate": "0", "program_focus": "Medicaid",
+                "keywords_matched": "Medicaid", "risks": "",
+            },
+            {
+                "id": "data-1", "title": "Eligibility dataset", "state": "Federal",
+                "agency": "CMS", "source": "data.medicaid.gov Catalog API",
+                "document_type": "Dataset", "fit_score": "55",
+                "budget_estimate": "0", "program_focus": "eligibility",
+                "keywords_matched": "eligibility", "risks": "",
+            },
+        ])
+
+        opportunity_ids = {row["id"] for row in self.store.list_opportunities()}
+        federal_records = {row["id"]: row for row in self.store.list_federal_records()}
+
+        self.assertEqual(opportunity_ids, {"sam-1"})
+        self.assertEqual(set(federal_records), {"register-1", "data-1"})
+        self.assertEqual(federal_records["register-1"]["record_category"], "policy_regulatory")
+        self.assertEqual(federal_records["data-1"]["record_category"], "medicaid_data")
+
 
 if __name__ == "__main__":
     unittest.main()

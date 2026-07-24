@@ -7,6 +7,11 @@ from pathlib import Path
 
 LIST_FIELDS = {"program_focus", "keywords_matched", "risks"}
 EXPIRATION_SIGNALS = {"Expiring soon", "Recompete watch"}
+FEDERAL_RECORD_CATEGORIES = {
+    "Federal Register API": ("policy_regulatory", "Policy & regulatory"),
+    "data.medicaid.gov Catalog API": ("medicaid_data", "Medicaid data"),
+    "CMS Provider Data Catalog API": ("provider_data", "Provider data"),
+}
 
 
 class CsvStore:
@@ -24,6 +29,7 @@ class CsvStore:
         records = [
             self._normalize_opportunity(row)
             for row in self._read_rows(self.opportunities_path)
+            if not self._is_federal_record(row)
         ]
         records.extend(
             self._normalize_state_opportunity(row)
@@ -43,11 +49,29 @@ class CsvStore:
             reverse=True,
         )
 
+    def list_federal_records(self) -> list[dict]:
+        records = [
+            self._normalize_federal_record(row)
+            for row in self._read_rows(self.opportunities_path)
+            if self._is_federal_record(row)
+        ]
+        return sorted(
+            records,
+            key=lambda row: (row.get("posted_date", ""), row.get("fit_score", 0)),
+            reverse=True,
+        )
+
     def get_opportunity(self, opportunity_id: str) -> dict | None:
         for opportunity in self.list_opportunities():
             if opportunity["id"] == opportunity_id:
                 opportunity["status_history"] = self.get_status_history(opportunity_id)
                 return opportunity
+        return None
+
+    def get_federal_record(self, record_id: str) -> dict | None:
+        for record in self.list_federal_records():
+            if record["id"] == record_id:
+                return record
         return None
 
     def list_sources(self) -> list[dict]:
@@ -169,6 +193,16 @@ class CsvStore:
             normalized["category_label"] = "Grant"
         return normalized
 
+    def _normalize_federal_record(self, row: dict) -> dict:
+        normalized = self._normalize_opportunity(row)
+        category, label = FEDERAL_RECORD_CATEGORIES[row.get("source", "")]
+        normalized["record_category"] = category
+        normalized["record_category_label"] = label
+        normalized["reviewable"] = False
+        normalized["categories"] = []
+        normalized["category_label"] = label
+        return normalized
+
     def _normalize_contract(self, row: dict, *, is_state: bool) -> dict:
         keywords = self._split_list(row.get("matched_keywords", ""))
         signal = row.get("recompete_signal", "")
@@ -264,6 +298,9 @@ class CsvStore:
         if "federal_opportunities" in categories:
             return "Federal opportunity"
         return "State opportunity"
+
+    def _is_federal_record(self, row: dict) -> bool:
+        return row.get("source", "") in FEDERAL_RECORD_CATEGORIES
 
     def _normalize_source(self, row: dict) -> dict:
         normalized = dict(row)

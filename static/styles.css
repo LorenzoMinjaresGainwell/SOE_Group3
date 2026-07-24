@@ -30,6 +30,20 @@ button {
   padding: 0.7rem 0.9rem;
 }
 
+.button-link {
+  background: #0f766e;
+  border-radius: 6px;
+  color: #fff;
+  display: inline-flex;
+  font-weight: 700;
+  padding: 0.7rem 0.9rem;
+  text-decoration: none;
+}
+
+.button-link:hover {
+  background: #0b5f59;
+}
+
 button:disabled {
   background: #9ca3af;
   cursor: not-allowed;
@@ -262,6 +276,26 @@ tbody tr.selected {
 
 .empty-row:hover {
   background: transparent;
+}
+
+.record-type-policy {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.record-type-medicaid {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.record-type-provider {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.record-link {
+  color: #0f766e;
+  font-weight: 700;
 }
 
 .title-cell {
