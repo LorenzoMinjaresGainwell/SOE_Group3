@@ -136,7 +136,7 @@
         {
           "source_key": "ak_iris_vss",
           "source_name": "Alaska IRIS Vendor Self Service",
-          "target_url": "https://iris-vss.alaska.gov/webapp/PRDVSS1X1/AltSelfService",
+          "target_url": "https://iris-vss.alaska.gov/PRDVSS1X1/Advantage4",
           "target_api": "CGI Advantage/VSS public solicitation and award screens; probe form/XHR endpoints.",
           "access_method": "vendor_platform_adapter",
           "platform": "CGI Advantage VSS",
@@ -848,7 +848,7 @@
         {
           "source_key": "mi_sigma_vss",
           "source_name": "Michigan SIGMA Vendor Self Service",
-          "target_url": "https://sigma.michigan.gov/webapp/PRDVSS2X1/AltSelfService",
+          "target_url": "https://sigma.michigan.gov/PRDVSS1X1/Advantage4",
           "target_api": "SIGMA VSS public solicitations/contracts; probe form/XHR endpoints.",
           "access_method": "vendor_platform_adapter",
           "platform": "CGI Advantage VSS/SIGMA",
@@ -1839,7 +1839,7 @@
         {
           "source_key": "wv_oasis_vss",
           "source_name": "wvOASIS Vendor Self Service",
-          "target_url": "https://www.wvoasis.gov/",
+          "target_url": "https://prd311.wvoasis.gov/PRDVSS1X1ERP/Advantage4",
           "target_api": "wvOASIS/VSS public solicitations/contracts; probe supplier portal routes.",
           "access_method": "vendor_platform_adapter",
           "platform": "wvOASIS VSS",
