@@ -21,6 +21,20 @@ ROOT = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT / "data"
 SAM_CONTRACT_AWARDS_URL = "https://api.sam.gov/contract-awards/v1/search"
 USER_AGENT = "soe-group3-sam-contract-awards/0.1"
+LEGACY_INCLUDE_SECTIONS = "contractId,coreData,awardDetails,awardeeData"
+ENRICHED_INCLUDE_SECTIONS = ",".join(
+    [
+        "contractId",
+        "coreData",
+        "awardDetails",
+        "awardeeData",
+        "dates",
+        "dollars",
+        "totalContractDollars",
+        "productOrServiceInformation",
+        "principalPlaceOfPerformance",
+    ]
+)
 
 SAM_CONTRACT_AWARD_FIELDS = [
     "award_id",
@@ -246,8 +260,8 @@ def build_request_params(
         {
             "api_key": config.api_key,
             "limit": str(limit),
-            "offset": str(page),
-            "includeSections": "contractId,coreData,awardDetails,awardeeData",
+            "offset": str(page * limit),
+            "includeSections": include_sections_for_config(config),
         }
     )
     if spec.deleted:
@@ -255,6 +269,11 @@ def build_request_params(
     if not DATE_FILTER_FIELDS.intersection(params):
         params[date_field] = format_date_range(start, end)
     return params
+
+
+def include_sections_for_config(config: SAMContractAwardsConfig) -> str:
+    # Preserve cache keys for existing raw payloads; use broader sections only on next live reset.
+    return ENRICHED_INCLUDE_SECTIONS if sam_live_enabled(config) else LEGACY_INCLUDE_SECTIONS
 
 
 def build_search_specs(config: SAMContractAwardsConfig, vendors: list[VendorConfig], keywords: list[str]) -> list[SearchSpec]:
@@ -406,8 +425,15 @@ def award_text(item: dict[str, Any]) -> str:
         "coreData.federalOrganization.contractingInformation.contractingOffice.name",
         "awardDetails.productOrServiceInformation.descriptionOfContractRequirement",
         "coreData.productOrServiceInformation.descriptionOfContractRequirement",
+        "coreData.acquisitionData.majorProgramCode",
         "awardDetails.productOrServiceInformation.principalNAICS.code",
+        "awardDetails.productOrServiceInformation.principalNAICS.name",
+        "coreData.productOrServiceInformation.principalNAICS.code",
+        "coreData.productOrServiceInformation.principalNAICS.name",
         "awardDetails.productOrServiceInformation.productOrService.code",
+        "awardDetails.productOrServiceInformation.productOrService.name",
+        "coreData.productOrServiceInformation.productOrService.code",
+        "coreData.productOrServiceInformation.productOrService.name",
     ]
     return " ".join(first_path(item, [path]) for path in paths)
 
@@ -425,10 +451,42 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
     source_record_id = source_id(item, piid, parent_award_id)
     award_id = stable_id("sam-award", source_record_id or json.dumps(item, sort_keys=True))
 
-    award_date = iso_date(first_path(item, ["awardDetails.dates.dateSigned", "coreData.dateSigned"]))
-    period_start = iso_date(first_path(item, ["awardDetails.dates.periodOfPerformanceStartDate"]))
-    period_end = iso_date(first_path(item, ["awardDetails.dates.currentCompletionDate"]))
-    potential_end = iso_date(first_path(item, ["awardDetails.dates.ultimateCompletionDate"]))
+    award_date = iso_date(
+        first_path(item, ["awardDetails.dates.dateSigned", "awardDetails.dateSigned", "coreData.dateSigned", "dateSigned"])
+    )
+    period_start = iso_date(
+        first_path(
+            item,
+            [
+                "awardDetails.dates.periodOfPerformanceStartDate",
+                "awardDetails.periodOfPerformanceStartDate",
+                "coreData.periodOfPerformanceStartDate",
+                "periodOfPerformanceStartDate",
+            ],
+        )
+    )
+    period_end = iso_date(
+        first_path(
+            item,
+            [
+                "awardDetails.dates.currentCompletionDate",
+                "awardDetails.currentCompletionDate",
+                "coreData.currentCompletionDate",
+                "currentCompletionDate",
+            ],
+        )
+    )
+    potential_end = iso_date(
+        first_path(
+            item,
+            [
+                "awardDetails.dates.ultimateCompletionDate",
+                "awardDetails.ultimateCompletionDate",
+                "coreData.ultimateCompletionDate",
+                "ultimateCompletionDate",
+            ],
+        )
+    )
     lifecycle_status = lifecycle(period_end, potential_end, spec.deleted)
     recompete_start = iso_date(add_months(parse_date(potential_end or period_end), -36)) if (potential_end or period_end) else ""
 
@@ -450,28 +508,59 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
     competitor_flag = "yes" if vendor_key not in {"", "unknown", "gainwell_technologies"} else "no"
 
     agency = clean_text(
-        first_path(item, ["coreData.federalOrganization.contractingInformation.contractingDepartment.name"]), 180
+        first_path(
+            item,
+            [
+                "coreData.federalOrganization.contractingInformation.contractingDepartment.name",
+                "coreData.federalOrganization.fundingInformation.fundingDepartment.name",
+                "contractingDepartment.name",
+                "department.name",
+            ],
+        ),
+        180,
     )
     subagency = clean_text(
-        first_path(item, ["coreData.federalOrganization.contractingInformation.contractingSubtier.name"]), 180
+        first_path(
+            item,
+            [
+                "coreData.federalOrganization.contractingInformation.contractingSubtier.name",
+                "coreData.federalOrganization.fundingInformation.fundingSubtier.name",
+                "contractId.subtier.name",
+                "subtier.name",
+            ],
+        ),
+        180,
     )
     office = clean_text(
-        first_path(item, ["coreData.federalOrganization.contractingInformation.contractingOffice.name"]), 180
+        first_path(
+            item,
+            [
+                "coreData.federalOrganization.contractingInformation.contractingOffice.name",
+                "coreData.federalOrganization.fundingInformation.fundingOffice.name",
+                "contractingOffice.name",
+                "office.name",
+            ],
+        ),
+        180,
     )
     naics = first_path(
         item,
         [
             "awardDetails.productOrServiceInformation.principalNAICS.code",
             "awardDetails.productOrServiceInformation.idvNAICS.code",
+            "awardDetails.productOrServiceInformation.naicsCode",
             "coreData.productOrServiceInformation.principalNAICS.code",
             "coreData.productOrServiceInformation.idvNAICS.code",
+            "coreData.productOrServiceInformation.naicsCode",
         ],
     )
     psc = first_path(
         item,
         [
             "awardDetails.productOrServiceInformation.productOrService.code",
+            "awardDetails.productOrServiceInformation.pscCode",
             "coreData.productOrServiceInformation.productOrService.code",
+            "coreData.productOrServiceInformation.pscCode",
         ],
     )
     description = clean_text(
@@ -480,6 +569,11 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
             [
                 "awardDetails.productOrServiceInformation.descriptionOfContractRequirement",
                 "coreData.productOrServiceInformation.descriptionOfContractRequirement",
+                "coreData.acquisitionData.majorProgramCode",
+                "awardDetails.productOrServiceInformation.productOrService.name",
+                "coreData.productOrServiceInformation.productOrService.name",
+                "awardDetails.productOrServiceInformation.principalNAICS.name",
+                "coreData.productOrServiceInformation.principalNAICS.name",
             ],
         ),
         1000,
@@ -493,7 +587,20 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
             "awardDetails.principalPlaceOfPerformance.state.name",
         ],
     )
-    award_amount = money(first_path(item, ["awardDetails.dollars.actionObligation", "awardDetails.dollars.baseDollarsObligated"]))
+    award_amount = money(
+        first_path(
+            item,
+            [
+                "awardDetails.dollars.actionObligation",
+                "awardDetails.dollars.baseDollarsObligated",
+                "awardDetails.dollars.obligatedAmount",
+                "awardDetails.actionObligation",
+                "coreData.dollars.actionObligation",
+                "coreData.actionObligation",
+                "actionObligation",
+            ],
+        )
+    )
     current_total = money(
         first_path(
             item,
@@ -501,6 +608,11 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
                 "awardDetails.totalContractDollars.totalBaseAndExercisedOptionsValue",
                 "awardDetails.totalContractDollars.totalActionObligation",
                 "awardDetails.dollars.baseAndExercisedOptionsValue",
+                "awardDetails.dollars.currentTotalValue",
+                "awardDetails.currentTotalValue",
+                "coreData.totalContractDollars.totalBaseAndExercisedOptionsValue",
+                "coreData.dollars.baseAndExercisedOptionsValue",
+                "currentTotalValue",
             ],
         )
     )
@@ -511,6 +623,11 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
                 "awardDetails.totalContractDollars.totalBaseAndAllOptionsValue",
                 "awardDetails.dollars.baseAndAllOptionsValue",
                 "awardDetails.dollars.totalEstimatedOrderValue",
+                "awardDetails.dollars.potentialTotalValue",
+                "awardDetails.potentialTotalValue",
+                "coreData.totalContractDollars.totalBaseAndAllOptionsValue",
+                "coreData.dollars.baseAndAllOptionsValue",
+                "potentialTotalValue",
             ],
         )
     )
@@ -537,7 +654,16 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
         "source_record_id": source_record_id,
         "piid": piid,
         "parent_award_id": parent_award_id,
-        "solicitation_number": first_path(item, ["coreData.solicitationId", "coreData.solicitationID"]),
+        "solicitation_number": first_path(
+            item,
+            [
+                "coreData.solicitationId",
+                "coreData.solicitationID",
+                "awardDetails.solicitationId",
+                "awardDetails.contractData.solicitationId",
+                "solicitationId",
+            ],
+        ),
         "award_date": award_date,
         "period_start_date": period_start,
         "period_end_date": period_end,
@@ -549,8 +675,24 @@ def normalize_award(item: dict[str, Any], spec: SearchSpec, vendors: list[Vendor
         "potential_total_value": potential_total,
         "vendor_key": vendor_key or "unknown",
         "vendor_name": vendor_name,
-        "uei_sam": first_path(item, ["awardDetails.awardeeData.awardeeUEIInformation.uniqueEntityId"]),
-        "cage_code": first_path(item, ["awardDetails.awardeeData.awardeeUEIInformation.cageCode"]),
+        "uei_sam": first_path(
+            item,
+            [
+                "awardDetails.awardeeData.awardeeUEIInformation.uniqueEntityId",
+                "awardDetails.awardeeData.awardeeUEIInformation.ueiSAM",
+                "awardDetails.awardeeData.awardeeUEIInformation.uei",
+                "awardDetails.awardeeData.ueiSAM",
+                "awardeeData.awardeeUEIInformation.uniqueEntityId",
+            ],
+        ),
+        "cage_code": first_path(
+            item,
+            [
+                "awardDetails.awardeeData.awardeeUEIInformation.cageCode",
+                "awardDetails.awardeeData.cageCode",
+                "awardeeData.awardeeUEIInformation.cageCode",
+            ],
+        ),
         "agency": agency,
         "subagency": subagency,
         "office": office,
@@ -718,10 +860,12 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 
 def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as handle:
+    tmp_path = path.with_name(f".{path.name}.tmp")
+    with tmp_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
+    tmp_path.replace(path)
 
 
 def date_window(config: SAMContractAwardsConfig) -> tuple[dt.date, dt.date]:
@@ -792,17 +936,65 @@ def sort_key(row: dict[str, str]) -> tuple[int, int, int, str]:
 
 def first_path(obj: dict[str, Any], paths: list[str]) -> str:
     for path in paths:
-        value: Any = obj
-        for part in path.split("."):
-            if not isinstance(value, dict) or part not in value:
-                value = None
-                break
-            value = value[part]
-        if value not in (None, "", [], {}):
-            if isinstance(value, dict):
-                return str(value.get("name") or value.get("code") or "")
-            return str(value)
+        for value in path_values(obj, path.split(".")):
+            text = scalar_text(value)
+            if text:
+                return text
     return ""
+
+
+def path_values(value: Any, parts: list[str]) -> list[Any]:
+    if not parts:
+        if isinstance(value, list):
+            output: list[Any] = []
+            for item in value:
+                output.extend(path_values(item, []))
+            return output
+        return [value]
+    if isinstance(value, list):
+        output = []
+        for item in value:
+            output.extend(path_values(item, parts))
+        return output
+    if not isinstance(value, dict):
+        return []
+    key = matching_key(value, parts[0])
+    if key is None:
+        return []
+    return path_values(value[key], parts[1:])
+
+
+def matching_key(mapping: dict[str, Any], requested: str) -> str | None:
+    if requested in mapping:
+        return requested
+    requested_lower = requested.lower()
+    for key in mapping:
+        if str(key).lower() == requested_lower:
+            return str(key)
+    requested_compact = re.sub(r"[^a-z0-9]+", "", requested_lower)
+    for key in mapping:
+        if re.sub(r"[^a-z0-9]+", "", str(key).lower()) == requested_compact:
+            return str(key)
+    return None
+
+
+def scalar_text(value: Any) -> str:
+    if value in (None, "", [], {}):
+        return ""
+    if isinstance(value, list):
+        for item in value:
+            text = scalar_text(item)
+            if text:
+                return text
+        return ""
+    if isinstance(value, dict):
+        for requested in ("name", "code", "value", "description"):
+            key = matching_key(value, requested)
+            text = scalar_text(value.get(key)) if key is not None else ""
+            if text:
+                return text
+        return ""
+    return str(value)
 
 
 def lifecycle(period_end: str, potential_end: str, deleted: bool) -> str:
@@ -963,8 +1155,8 @@ def money(value: Any) -> str:
     if value in (None, ""):
         return ""
     try:
-        return str(int(round(float(str(value).replace(",", "")))))
-    except ValueError:
+        return str(int(round(float(str(value).replace(",", "").replace("$", "")))))
+    except (TypeError, ValueError):
         return ""
 
 
@@ -975,8 +1167,8 @@ def best_money(*values: str) -> str:
 
 def int_or_zero(value: Any) -> int:
     try:
-        return int(float(str(value or 0).replace(",", "")))
-    except ValueError:
+        return int(float(str(value or 0).replace(",", "").replace("$", "")))
+    except (TypeError, ValueError):
         return 0
 
 

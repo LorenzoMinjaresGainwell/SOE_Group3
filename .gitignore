@@ -6,3 +6,4 @@ __pycache__/
 .venv/
 *.log
 data/raw/sam/
+data/raw/state_contracts/tx_dir/

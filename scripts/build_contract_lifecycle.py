@@ -71,11 +71,12 @@ def main() -> int:
         "rows": len(result.rows),
         "counts_by_status": result.counts_by_status,
         "counts_by_vendor": result.counts_by_vendor,
+        "source_counts": result.source_counts,
         "missing_optional_inputs": result.missing_optional_inputs,
         "empty_optional_inputs": result.empty_optional_inputs,
         "output": args.out,
         "dry_run": args.dry_run,
-        "source_scope": "usaspending_only",
+        "source_scope": "multi_source" if len(result.source_counts) > 1 else "usaspending_only",
     }
 
     if args.json:
@@ -89,6 +90,9 @@ def main() -> int:
         print("Counts by vendor:")
         for vendor_key, count in result.counts_by_vendor.items():
             print(f"- {vendor_key}: {count}")
+        print("Counts by source:")
+        for source_key, count in result.source_counts.items():
+            print(f"- {source_key}: {count}")
         if result.missing_optional_inputs:
             print("Missing SAM/entity inputs not joined:")
             for path in result.missing_optional_inputs:

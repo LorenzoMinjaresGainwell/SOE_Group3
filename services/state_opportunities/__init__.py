@@ -3,23 +3,27 @@ from __future__ import annotations
 import importlib
 from typing import Callable
 
-from services.state_opportunities import ak, ga, il, la, ma, mi, nj, nv, pa, tx, wa, wv
+from services.state_opportunities import ak, ca, fl, ga, il, la, ma, mi, nc, nj, nv, pa, tx, wa, wi, wv
 
 oregon = importlib.import_module("services.state_opportunities.or")
 
 STATE_CLIENTS = {
     "AK": ak.fetch_opportunities,
+    "CA": ca.fetch_opportunities,
+    "FL": fl.fetch_opportunities,
     "GA": ga.fetch_opportunities,
     "IL": il.fetch_opportunities,
     "LA": la.fetch_opportunities,
     "MA": ma.fetch_opportunities,
     "MI": mi.fetch_opportunities,
+    "NC": nc.fetch_opportunities,
     "NJ": nj.fetch_opportunities,
     "NV": nv.fetch_opportunities,
     "OR": oregon.fetch_opportunities,
     "PA": pa.fetch_opportunities,
     "TX": tx.fetch_opportunities,
     "WA": wa.fetch_opportunities,
+    "WI": wi.fetch_opportunities,
     "WV": wv.fetch_opportunities,
 }
 

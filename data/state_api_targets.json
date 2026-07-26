@@ -259,10 +259,10 @@
         {
           "source_key": "ca_caleprocure",
           "source_name": "Cal eProcure",
-          "target_url": "https://caleprocure.ca.gov/",
-          "target_api": "Cal eProcure event and contract searches; probe public search endpoints and downloadable exports.",
-          "access_method": "public_portal_adapter",
-          "platform": "Cal eProcure",
+          "target_url": "https://caleprocure.ca.gov/pages/Events-BS3/event-search.aspx",
+          "target_api": "Cal eProcure InFlight NLX public PeopleSoft event search proxy for AUC_RESP_INQ_AUC; contracts remain separate.",
+          "access_method": "vendor_platform_adapter",
+          "platform": "Cal eProcure InFlight / PeopleSoft eProcurement",
           "requires_api_key": false,
           "information_tags": [
             "opportunities",
@@ -275,8 +275,8 @@
             "state_opportunities",
             "state_contracts"
           ],
-          "confidence": "medium",
-          "notes": "Large Medicaid/Medi-Cal market; high priority."
+          "confidence": "high",
+          "notes": "Public event search uses InFlight NLX facade over PeopleSoft selectors and /nlx3/psc/psfpd1/SUPPLIER/ERP/c/AUC_MANAGE_BIDS.AUC_RESP_INQ_AUC.GBL."
         }
       ]
     },

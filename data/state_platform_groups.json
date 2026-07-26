@@ -357,6 +357,29 @@
       "shared_adapter_candidate": true,
       "sources": [
         {
+          "source_key": "ca_caleprocure",
+          "jurisdiction_code": "CA",
+          "jurisdiction_name": "California",
+          "source_name": "Cal eProcure",
+          "target_url": "https://caleprocure.ca.gov/pages/Events-BS3/event-search.aspx",
+          "target_api": "Cal eProcure InFlight NLX public PeopleSoft event search proxy for AUC_RESP_INQ_AUC; contracts remain separate.",
+          "raw_platform": "Cal eProcure InFlight / PeopleSoft eProcurement",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates",
+            "grants"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Reclassified from custom portal: public Events-BS3 page exposes PeopleSoft selectors and stable /nlx3/psc/psfpd1/SUPPLIER/ERP/c/AUC_MANAGE_BIDS.AUC_RESP_INQ_AUC.GBL event table."
+        },
+        {
           "source_key": "ks_esupplier",
           "jurisdiction_code": "KS",
           "jurisdiction_name": "Kansas",
@@ -376,7 +399,7 @@
             "state_contracts"
           ],
           "classification_confidence": "high",
-          "notes": "PeopleSoft state can require session/form-state handling."
+          "notes": "Focused probe found PeopleSoft signals, but landing and public bid components redirect to PeopleSoft login/cookies error; public events blocked."
         },
         {
           "source_key": "mn_swift_supplier",
@@ -398,7 +421,7 @@
             "state_contracts"
           ],
           "classification_confidence": "high",
-          "notes": "High health and eligibility systems priority."
+          "notes": "Focused probe found catalog PeopleSoft/SWIFT signal, but target host supplier.swift.state.mn.us returned DNS NXDOMAIN from CLI; public events blocked pending replacement target."
         },
         {
           "source_key": "tn_edison_supplier",
@@ -420,7 +443,7 @@
             "state_contracts"
           ],
           "classification_confidence": "high",
-          "notes": "High Medicaid/TennCare priority."
+          "notes": "Focused probe found PeopleSoft/Edison signal, but landing and public bid components redirect to Oracle IDCS login; public events blocked."
         }
       ],
       "reclassification_signals": [
@@ -882,29 +905,6 @@
           ],
           "classification_confidence": "medium",
           "notes": "Use DFA/TSS procurement pages as fallback for statewide contracts."
-        },
-        {
-          "source_key": "ca_caleprocure",
-          "jurisdiction_code": "CA",
-          "jurisdiction_name": "California",
-          "source_name": "Cal eProcure",
-          "target_url": "https://caleprocure.ca.gov/",
-          "target_api": "Cal eProcure event and contract searches; probe public search endpoints and downloadable exports.",
-          "raw_platform": "Cal eProcure",
-          "raw_access_method": "public_portal_adapter",
-          "information_tags": [
-            "opportunities",
-            "awards",
-            "contracts",
-            "procurement_updates",
-            "grants"
-          ],
-          "adapter_targets": [
-            "state_opportunities",
-            "state_contracts"
-          ],
-          "classification_confidence": "medium",
-          "notes": "Large Medicaid/Medi-Cal market; high priority."
         },
         {
           "source_key": "ct_ctsource",

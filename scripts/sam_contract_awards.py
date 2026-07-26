@@ -3,6 +3,9 @@
 
 Run from repo root:
     ./scripts/sam_contract_awards.py --dry-run --max-searches 4
+
+Cache-only regression for the two cached HHS award calls:
+    python3 scripts/sam_contract_awards.py --mode historic --agency-codes 7500 --max-searches 2 --max-per-search 100 --page-limit 100 --max-pages 1 --sam-quota-mode cache-only --json
 """
 
 from __future__ import annotations

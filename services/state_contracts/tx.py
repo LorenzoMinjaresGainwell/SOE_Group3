@@ -10,6 +10,8 @@ import urllib.parse
 import urllib.request
 from typing import Any, Callable
 
+from . import tx_dir
+
 TXSMARTBUY_LIST_URL = "https://www.txsmartbuy.gov/app/extensions/CPA/CPAMain/1.0.0/services/BrowseContracts.Service.ss"
 TXSMARTBUY_DETAIL_URL = "https://www.txsmartbuy.gov/app/extensions/CPA/CPAMain/1.0.0/services/BrowseContracts.Details.Service.ss"
 TXSMARTBUY_SOURCE_URL = "https://www.txsmartbuy.gov/browsecontracts"
@@ -49,6 +51,22 @@ def fetch_contracts(
                 continue
             seen_record_ids.add(record["id"])
             records.append(record)
+
+    try:
+        dir_records = tx_dir.fetch_contracts(
+            vendor_terms=vendor_terms,
+            keywords=keywords,
+            max_per_vendor=max_per_vendor,
+            progress=progress,
+        )
+        emit(progress, f"TX DIR: {len(dir_records)} normalized cooperative contract records")
+        for record in dir_records:
+            if record["id"] in seen_record_ids:
+                continue
+            seen_record_ids.add(record["id"])
+            records.append(record)
+    except Exception as exc:
+        emit(progress, f"TX DIR: skipped after TXSmartBuy due to {exc}")
 
     return sorted(records, key=lambda row: (int(row["relevance_score"]), row["end_date"], row["title"]), reverse=True)
 
