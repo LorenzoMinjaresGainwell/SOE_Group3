@@ -1,3 +1,6 @@
 opportunity_id,from_status,to_status,changed_at,changed_by,note
 opp-001,Detected,Unreviewed,2026-07-02T11:15:00Z,System,Opportunity extracted from monitored source.
 opp-002,Unreviewed,Monitor,2026-07-02T12:00:00Z,Prototype User,Waiting for partner eligibility confirmation.
+opp-001,Unreviewed,Pursue,2026-07-23T22:10:57Z,Local User,Status changed in local dashboard.
+opp-001,Pursue,Monitor,2026-07-23T22:10:59Z,Local User,Status changed in local dashboard.
+usaspending-CONT_AWD_75FCMC23F0001_7530_75FCMC19D0096_7530,Unreviewed,Pursue,2026-07-24T00:08:28Z,Local User,Status changed in local dashboard.

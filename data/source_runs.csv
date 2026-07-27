@@ -1,2 +1,12 @@
+<<<<<<< Updated upstream
 source,mode,last_successful_run,started_at,finished_at,status,records_found,records_added,records_updated,message
 sam,historic,2026-07-26T14:18:24Z,2026-07-26T14:18:09Z,2026-07-26T14:18:24Z,ok,21,21,0,21 records found
+=======
+source,mode,last_successful_run,started_at,finished_at,status,records_found,records_added,records_updated,message
+sam,continue,2026-07-23T22:01:29Z,2026-07-23T22:01:29Z,2026-07-23T22:01:29Z,ok,0,96,0,0 records found
+grants,continue,,2026-07-23T22:01:29Z,2026-07-23T22:01:37Z,error,0,96,0,request failed: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1006)>
+federal_register,continue,2026-07-23T22:01:38Z,2026-07-23T22:01:37Z,2026-07-23T22:01:38Z,ok,25,96,0,25 records found
+medicaid,continue,2026-07-23T22:01:38Z,2026-07-23T22:01:38Z,2026-07-23T22:01:38Z,ok,25,96,0,25 records found
+cms_provider,continue,2026-07-23T22:01:39Z,2026-07-23T22:01:38Z,2026-07-23T22:01:39Z,ok,21,96,0,21 records found
+usaspending,continue,2026-07-23T22:01:44Z,2026-07-23T22:01:39Z,2026-07-23T22:01:44Z,ok,25,96,0,25 records found
+>>>>>>> Stashed changes
