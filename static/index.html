@@ -10,12 +10,8 @@
     <header class="topbar">
       <div>
         <h1>Rural Health Opportunity Dashboard</h1>
-        <p class="refresh-status" id="refreshStatus">Checking data freshness…</p>
       </div>
-      <div class="header-actions">
-        <button type="button" id="refreshButton">Refresh now</button>
-        <a class="button-link" href="/?view=records">Federal Records</a>
-      </div>
+      <a class="button-link" href="/?view=records">Federal Records</a>
     </header>
 
     <main>
@@ -72,21 +68,16 @@
         </aside>
       </section>
 
-      <section class="lower-grid">
-        <section class="panel">
-          <div class="panel-heading">
-            <h2>Monitored sources</h2>
-          </div>
-          <div id="sourcesList" class="stack-list"></div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading">
-            <h2>Scoring model</h2>
-          </div>
-          <div id="rulesList" class="stack-list"></div>
-        </section>
-      </section>
+      <footer class="data-footer">
+        <details>
+          <summary>Monitored sources <span id="sourceCount"></span></summary>
+          <div id="sourcesList" class="footer-list"></div>
+        </details>
+        <details>
+          <summary>Scoring model <span id="ruleCount"></span></summary>
+          <div id="rulesList" class="footer-list"></div>
+        </details>
+      </footer>
     </main>
 
     <script src="/static/app.js?v=20260723-2"></script>

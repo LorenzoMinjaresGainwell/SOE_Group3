@@ -25,8 +25,8 @@ const els = {
   sources: document.querySelector("#sourcesList"),
   rules: document.querySelector("#rulesList"),
   tabs: document.querySelector("#categoryTabs"),
-  refreshStatus: document.querySelector("#refreshStatus"),
-  refreshButton: document.querySelector("#refreshButton"),
+  sourceCount: document.querySelector("#sourceCount"),
+  ruleCount: document.querySelector("#ruleCount"),
 };
 
 async function api(path, options = {}) {
@@ -289,24 +289,25 @@ async function updateStatus(status) {
 
 async function renderSourcesAndRules() {
   const [sources, rules] = await Promise.all([api("/api/sources"), api("/api/scoring-rules")]);
+  els.sourceCount.textContent = sources.length;
+  els.ruleCount.textContent = rules.length;
   els.sources.innerHTML = sources.map((source) => `
-    <div class="stack-item">
+    <div class="footer-item">
       <strong>${escapeHtml(source.name)}</strong>
-      <p>${escapeHtml(source.state)} | ${escapeHtml(source.type)} | ${escapeHtml(source.status)}</p>
-      <p>${source.opportunities_found} found, checked ${formatDateTime(source.last_checked_at)}</p>
+      <span>${escapeHtml(source.state)} · ${escapeHtml(source.status)} · ${source.opportunities_found} found · ${formatDateTime(source.last_checked_at)}</span>
     </div>
   `).join("");
 
   els.rules.innerHTML = rules.map((rule) => `
-    <div class="stack-item">
-      <strong>${escapeHtml(rule.category)} (${rule.weight})</strong>
-      <p>${escapeHtml(rule.description)}</p>
+    <div class="footer-item">
+      <strong>${escapeHtml(rule.category)} · ${rule.weight}</strong>
+      <span>${escapeHtml(rule.description)}</span>
     </div>
   `).join("");
 }
 
 async function init() {
-  await startAutoRefresh(false);
+  await startAutoRefresh();
   state.opportunities = await api("/api/opportunities");
   state.selectedId = state.opportunities[0]?.id || null;
   renderCategoryTabs();
@@ -316,27 +317,18 @@ async function init() {
   if (state.selectedId) await selectOpportunity(state.selectedId);
 }
 
-async function startAutoRefresh(force) {
+async function startAutoRefresh() {
   const status = await api("/api/refresh", {
     method: "POST",
-    body: JSON.stringify({ force }),
+    body: JSON.stringify({ force: true }),
   });
-  renderRefreshStatus(status);
   if (status.running || status.started) pollRefresh();
-}
-
-function renderRefreshStatus(status) {
-  els.refreshButton.disabled = Boolean(status.running);
-  els.refreshButton.textContent = status.running ? "Refreshing…" : "Refresh now";
-  const when = status.finished_at ? ` Last completed ${formatDateTime(status.finished_at)}.` : "";
-  els.refreshStatus.textContent = `${status.message || "Data refresh is ready."}${when} SAM.gov uses cached data and is not called automatically.`;
 }
 
 function pollRefresh() {
   const timer = setInterval(async () => {
     try {
       const status = await api("/api/refresh/status");
-      renderRefreshStatus(status);
       if (!status.running) {
         clearInterval(timer);
         state.opportunities = await api("/api/opportunities");
@@ -348,8 +340,7 @@ function pollRefresh() {
       }
     } catch (error) {
       clearInterval(timer);
-      els.refreshStatus.textContent = error.message;
-      els.refreshButton.disabled = false;
+      console.warn("Automatic data refresh status check failed:", error);
     }
   }, 3000);
 }
@@ -383,9 +374,6 @@ function renderFilteredView() {
 els.search.addEventListener("input", renderFilteredView);
 els.score.addEventListener("input", renderFilteredView);
 els.status.addEventListener("change", renderFilteredView);
-els.refreshButton.addEventListener("click", () => startAutoRefresh(true).catch((error) => {
-  els.refreshStatus.textContent = error.message;
-}));
 
 init().catch((error) => {
   document.body.innerHTML = `<main><section class="panel"><h1>Unable to load dashboard</h1><p>${escapeHtml(error.message)}</p></section></main>`;

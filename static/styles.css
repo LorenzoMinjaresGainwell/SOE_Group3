@@ -353,19 +353,6 @@ tbody tr.selected {
   color: #5b21b6;
 }
 
-.header-actions {
-  align-items: center;
-  display: flex;
-  gap: 0.75rem;
-}
-
-.refresh-status {
-  color: #d9eee4;
-  font-size: 0.82rem;
-  margin: 0.3rem 0 0;
-  max-width: 52rem;
-}
-
 .refresh-badge {
   margin-left: 0.3rem;
 }
@@ -430,8 +417,7 @@ tbody tr.selected {
   line-height: 1.55;
 }
 
-.field-grid,
-.lower-grid {
+.field-grid {
   display: grid;
   gap: 1rem;
 }
@@ -487,15 +473,64 @@ tbody tr.selected {
   margin: 0.3rem 0 0;
 }
 
-.lower-grid {
+.data-footer {
+  border-top: 1px solid #dbe5e0;
+  color: #51635d;
+  display: grid;
+  font-size: 0.78rem;
+  gap: 0.65rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1.25rem;
+  padding: 0.8rem 0 0.25rem;
+}
+
+.data-footer details {
+  background: #f7faf8;
+  border: 1px solid #e2eae6;
+  border-radius: 6px;
+}
+
+.data-footer summary {
+  cursor: pointer;
+  font-weight: 800;
+  list-style-position: inside;
+  padding: 0.55rem 0.7rem;
+}
+
+.data-footer summary span {
+  background: #e5eee9;
+  border-radius: 999px;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.38rem;
+}
+
+.footer-list {
+  border-top: 1px solid #e2eae6;
+  display: grid;
+  max-height: 13rem;
+  overflow: auto;
+  padding: 0.25rem 0.7rem 0.5rem;
+}
+
+.footer-item {
+  display: grid;
+  gap: 0.08rem;
+  padding: 0.35rem 0;
+}
+
+.footer-item + .footer-item {
+  border-top: 1px solid #e8eeeb;
+}
+
+.footer-item span {
+  color: #71817a;
 }
 
 @media (max-width: 900px) {
   .topbar,
   .workspace,
   .toolbar,
-  .lower-grid,
+  .data-footer,
   .metrics {
     grid-template-columns: 1fr;
   }
