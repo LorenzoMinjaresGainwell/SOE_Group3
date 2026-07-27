@@ -271,6 +271,41 @@
           ],
           "confidence": "high",
           "notes": "Reclassified for state_contracts from Events-BS3 event rows to Cal eProcure homepage-linked LPASearch current contract route /pages/LPASearch/lpa-search.aspx backed by /nlx3/psc/psfpd1/SUPPLIER/ERP/c/ZZ_PO.ZZ_CNT_SRC_CMP_BKP.GBL."
+        },
+        {
+          "source_key": "ca_medi_cal_provider_updates",
+          "source_name": "Medi-Cal Provider News and Bulletins",
+          "target_url": "https://mcweb.apps.prd.cammis.medi-cal.ca.gov/publications",
+          "target_api": "Official Medi-Cal public React/Directus GraphQL endpoint /graphql, using public token exposed by /environment.js. Queries news_articles and recent bulletins with article title, publish/revision date, category/community, body/summary, and stable article IDs; legacy files.medi-cal.ca.gov pages timed out from CLI.",
+          "access_method": "official_portal_json",
+          "platform": "Medi-Cal public Directus GraphQL",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented policy update adapter services/state_updates/ca.py. Source is provider-policy/program updates, not procurement opportunities."
+        },
+        {
+          "source_key": "ca_dhcs_news_sitemap",
+          "source_name": "DHCS News XML Sitemap",
+          "target_url": "https://www.dhcs.ca.gov/dhcs-news-sitemap.xml",
+          "target_api": "Official DHCS Yoast XML news sitemap with loc and lastmod metadata. Direct DHCS WordPress pages and REST routes returned Incapsula challenge HTML from CLI; sitemap remains a stable official dated feed fallback.",
+          "access_method": "sitemap_adapter",
+          "platform": "DHCS WordPress/Yoast sitemap",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "medium",
+          "notes": "Adapter derives titles from news URL slugs and filters to monitored keywords/DHCS-Medi-Cal context; not used for undated landing pages."
         }
       ]
     },
@@ -576,6 +611,40 @@
           ],
           "confidence": "medium",
           "notes": "High Medicaid/enterprise procurement priority."
+        },
+        {
+          "source_key": "il_hfs_provider_notices",
+          "source_name": "Illinois HFS Provider Notices",
+          "target_url": "https://hfs.illinois.gov/medicalproviders/notices.html",
+          "target_api": "Implemented first-party AEM datatable JSON endpoint backing Provider Notices: /content/soi/hfs/en/medicalproviders/notices/jcr:content/responsivegrid/container/container_293684588/datatablecontentfrag.datatablecontentfragment.json.",
+          "access_method": "official_portal_json",
+          "platform": "Illinois HFS AEM datatable JSON",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter keeps current/prior two-year provider notices to avoid archive crowding."
+        },
+        {
+          "source_key": "il_hfs_public_notices",
+          "source_name": "Illinois HFS Public Notices",
+          "target_url": "https://hfs.illinois.gov/info/legal/publicnotices.html",
+          "target_api": "Implemented official HFS Legal Center public-notice page parser for dated Medicaid waiver/SPA/public notice document links.",
+          "access_method": "html_page_adapter",
+          "platform": "Illinois HFS static public notice page",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Public notices only; no BidBuy/procurement rows ingested."
         }
       ]
     },
@@ -820,6 +889,23 @@
           ],
           "confidence": "medium",
           "notes": "High Medicaid and health IT priority."
+        },
+        {
+          "source_key": "ma_masshealth_policy_updates",
+          "source_name": "MassHealth provider bulletins and public notices",
+          "target_url": "https://www.mass.gov/lists/masshealth-provider-bulletins",
+          "target_api": "Blocked/rejected for adapter ingestion in this pass: Mass.gov list routes for provider bulletins, public notices, 1115 waiver, transmittal letters, RSS/search variants, and JSON variants returned 403 Not allowed or 404 from CLI probes; no stable public row endpoint was accepted.",
+          "access_method": "manual_probe_required",
+          "platform": "Mass.gov Drupal/Akamai 403 from CLI",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "medium",
+          "notes": "No services/state_updates/ma.py adapter registered to avoid a no-op or brittle source. Reprobe from a manager-approved environment may be needed."
         }
       ]
     },
@@ -851,6 +937,76 @@
           ],
           "confidence": "medium",
           "notes": "High Medicaid/eligibility systems priority."
+        },
+        {
+          "source_key": "mi_mdhhs_policy_bulletins",
+          "source_name": "Michigan MDHHS Medicaid Policy Bulletins",
+          "target_url": "https://www.michigan.gov/mdhhs/doing-business/providers/providers/medicaid/policyforms/2026-medicaid-policy-bulletins",
+          "target_api": "Implemented official MDHHS HTML table parser for issue date, bulletin number/link, consultation summary, and subject across current policy bulletin pages.",
+          "access_method": "html_table_adapter",
+          "platform": "Michigan.gov/MDHHS Sitecore table",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Current adapter covers 2026 and 2025 bulletin pages."
+        },
+        {
+          "source_key": "mi_mdhhs_provider_alerts",
+          "source_name": "Michigan MDHHS Medicaid Provider Alerts",
+          "target_url": "https://www.michigan.gov/mdhhs/assistance-programs/medicaid/portalhome/medicaid-providers/medicaid-provider-alerts/all-alerts-and-updates",
+          "target_api": "Implemented official provider-alert link parser with michigan.gov/mdhhs sitemap lastmod dates for item metadata.",
+          "access_method": "html_page_adapter",
+          "platform": "Michigan.gov/MDHHS provider alert page plus sitemap",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "No SIGMA/procurement rows ingested."
+        },
+        {
+          "source_key": "mi_mdhhs_public_notices",
+          "source_name": "Michigan MDHHS Medicaid Public Notices",
+          "target_url": "https://www.michigan.gov/mdhhs/assistance-programs/medicaid/portalhome/resources/public-notices",
+          "target_api": "Implemented official HTML table parser for release date, comment due date, and public notice description/document link.",
+          "access_method": "html_table_adapter",
+          "platform": "Michigan.gov/MDHHS Medicaid public notices table",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "SPA/public-comment notice source."
+        },
+        {
+          "source_key": "mi_mdhhs_rhtp_updates",
+          "source_name": "Michigan MDHHS Rural Health Transformation Program Updates",
+          "target_url": "https://www.michigan.gov/mdhhs/assistance-programs/medicaid/rural-health-transformation-program/rhtp-updates",
+          "target_api": "Implemented official RHTP Updates page parser for dated RHTP news/grant/application links.",
+          "access_method": "html_page_adapter",
+          "platform": "Michigan.gov/MDHHS RHTP page",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates",
+            "grants"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "RHT/rural-health notices only; not procurement portal data."
         }
       ]
     },
@@ -1094,6 +1250,40 @@
           ],
           "confidence": "medium",
           "notes": "Prior finding: bids easier; active contracts need JSF state handling."
+        },
+        {
+          "source_key": "nj_dhs_public_notices",
+          "source_name": "New Jersey DHS Public Notices",
+          "target_url": "https://nj.gov/humanservices/notices/grants/public-notices/",
+          "target_api": "Implemented HTML table parser for Division/Office, Notice, posting/hearing/due date, and comments/effective-date columns. Keeps DMAHS/Medicaid/behavioral-health relevant notices and linked documents.",
+          "access_method": "html_table_adapter",
+          "platform": "NJ DHS public notices static table",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented in services/state_updates/nj.py."
+        },
+        {
+          "source_key": "nj_dmahs_medicaid_communications",
+          "source_name": "NJ DMAHS Medicaid Communications",
+          "target_url": "https://nj.gov/humanservices/dmahs/providers-stakeholders/provider-resources/medicaid-communications/",
+          "target_api": "Implemented conservative parser for official DMAHS Medicaid communication PDF links; PDF Last-Modified headers provide record dates where item-level page dates are absent.",
+          "access_method": "html_page_adapter",
+          "platform": "NJ DMAHS static accordion/PDF list",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "No procurement rows ingested; provider-resource Medicaid communications only."
         }
       ]
     },
@@ -1362,6 +1552,57 @@
           ],
           "confidence": "medium",
           "notes": "High Medicaid modernization relevance."
+        },
+        {
+          "source_key": "or_oha_ohp_announcements",
+          "source_name": "OHA Oregon Health Plan Announcements and Public Notices",
+          "target_url": "https://www.oregon.gov/oha/HSD/OHP/Pages/Announcements.aspx",
+          "target_api": "Official Oregon SharePoint REST list /oha/HSD/OHP/_api/web/GetList('/OHA/HSD/OHP/Announcements')/items exposes URL description/link, Issue_x0020_Date, category/applies-to, created/modified metadata. Public Notices page reuses the same list.",
+          "access_method": "official_portal_json",
+          "platform": "Oregon.gov SharePoint list REST",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented policy update adapter services/state_updates/or.py."
+        },
+        {
+          "source_key": "or_oha_provider_matters",
+          "source_name": "OHA Provider Matters",
+          "target_url": "https://www.oregon.gov/oha/HSD/OHP/Pages/Provider-Matters.aspx",
+          "target_api": "Official Oregon SharePoint REST list /oha/HSD/OHP/_api/web/GetList('/oha/HSD/OHP/Lists/ProviderMatters')/items exposes URL description/link, Issue_x0020_Date, and issue comments for OHP fee-for-service provider policy updates.",
+          "access_method": "official_portal_json",
+          "platform": "Oregon.gov SharePoint list REST",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented policy update adapter services/state_updates/or.py."
+        },
+        {
+          "source_key": "or_oha_state_plan_amendments",
+          "source_name": "OHA Medicaid and CHIP State Plan Amendments",
+          "target_url": "https://www.oregon.gov/oha/HSD/Medicaid-Policy/Pages/State-Plans.aspx",
+          "target_api": "Official Oregon SharePoint REST document library /oha/HSD/Medicaid-Policy/_api/web/GetList('/oha/HSD/Medicaid-Policy/StatePlans')/items exposes Title, Category, URL, Date, Created, and Modified metadata for proposed/approved Medicaid and CHIP SPAs.",
+          "access_method": "official_portal_json",
+          "platform": "Oregon.gov SharePoint list REST",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented policy update adapter services/state_updates/or.py."
         }
       ]
     },
@@ -1432,6 +1673,23 @@
           ],
           "confidence": "high",
           "notes": "Strong RHT signal source."
+        },
+        {
+          "source_key": "pa_dhs_medicaid_changes",
+          "source_name": "PA DHS Medicaid Changes",
+          "target_url": "https://www.pa.gov/agencies/dhs/resources/medicaid/medicaid-changes",
+          "target_api": "Official PA DHS HTML page; state_updates adapter normalizes page modified date plus January 1, 2027 effective-date milestones as a Medicaid policy update.",
+          "access_method": "html_page_adapter",
+          "platform": "PA DHS",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented in services/state_updates/pa.py. PA bulletin search and provider quick tips were probed but rejected for adapter ingestion because static listings lacked stable row-level issue/effective dates."
         }
       ]
     },
@@ -1466,6 +1724,41 @@
           ],
           "confidence": "high",
           "notes": "Implemented state_contracts adapter services/state_contracts/pr.py for ASG Contratos. Dry-run with Gainwell Technologies scanned 512 contract document cards and returned 0 Gainwell/default-keyword records; source is valid for awarded/current vendor contract metadata. RUS open subastas are not stored as contracts."
+        },
+        {
+          "source_key": "pr_ases_communications",
+          "source_name": "Puerto Rico ASES Comunicaciones",
+          "target_url": "https://www.ases.pr.gov/comunicaciones?categoria=Cartas%2BNormativas%2By%2BCirculares#Documentos",
+          "target_api": "Implemented Webflow/static document-card parser for ASES Cartas Normativas y Circulares, Ordenes Administrativas, SBS/SPA public notices, and press communications; document dates come from official docs.pr.gov PDF Last-Modified headers or official title date codes when available.",
+          "access_method": "html_page_adapter",
+          "platform": "ASES Webflow document cards plus docs.pr.gov PDFs",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented in services/state_updates/pr.py. Spanish source titles/summaries are preserved; obvious Spanish healthcare terms are mapped to existing topic keys. PR RUS subastas are not used."
+        },
+        {
+          "source_key": "pr_salud_news",
+          "source_name": "Puerto Rico Departamento de Salud Noticias",
+          "target_url": "https://www.salud.pr.gov/",
+          "target_api": "Implemented dated Salud news-card parser filtered to Medicaid/ASES/CMS, health-policy, telehealth/digital-health, provider, workforce, hospital, behavioral-health, and rural-health program context.",
+          "access_method": "html_page_adapter",
+          "platform": "Salud PR CMS news cards",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "medium",
+          "notes": "The Salud procurement/subastas page is intentionally excluded; only dated news/program cards from the health agency homepage are parsed."
         }
       ]
     },
@@ -1657,6 +1950,23 @@
           ],
           "confidence": "medium",
           "notes": "Implemented in services/state_contracts/tx_dir.py and integrated through the TX state_contracts adapter; keep data/raw/state_contracts/tx_dir uncommitted."
+        },
+        {
+          "source_key": "tx_tmhp_news",
+          "source_name": "TMHP Recent News",
+          "target_url": "https://www.tmhp.com/news",
+          "target_api": "Official TMHP Drupal HTML listing; state_updates adapter parses dated <time> rows from /news, filters Medicaid/provider/policy/system-update titles, and fetches detail descriptions when available.",
+          "access_method": "html_search_adapter",
+          "platform": "TMHP Drupal",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented in services/state_updates/tx.py. Direct hhs.texas.gov provider-alerts, waiver, and Medicaid/CHIP state-plan pages returned HTTP 403 Access Denied from CLI probes; TMHP is official Texas Medicaid & Healthcare Partnership provider news."
         }
       ]
     },
@@ -1785,6 +2095,58 @@
           ],
           "confidence": "high",
           "notes": "No state_contracts adapter registered. Official current-contract browse is browser-check/reCAPTCHA gated; mvendor public search/Solr is AWS WAF challenged from CLI; alternate Logi/DGS pages lacked required contract-domain fields."
+        },
+        {
+          "source_key": "va_medicaid_provider_memos",
+          "source_name": "Virginia Medicaid Memo & Bulletin Library",
+          "target_url": "https://vamedicaid.dmas.virginia.gov/provider/library",
+          "target_api": "Implemented HTML table parser for official Virginia Medicaid yearly memo/bulletin pages (2026 and 2025); rows expose issue date, title, audience, and stable bulletin detail URL.",
+          "access_method": "html_table_adapter",
+          "platform": "Virginia Medicaid Drupal memo/bulletin library",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented in services/state_updates/va.py. Source is linked from DMAS Provider Memos & Communications; eVA solicitations are not used for policy updates."
+        },
+        {
+          "source_key": "va_dmas_press_releases",
+          "source_name": "Virginia DMAS Press Releases",
+          "target_url": "https://www.dmas.virginia.gov/news-updates/press-releases/",
+          "target_api": "Implemented conservative DMAS press-release card parser for dated Medicaid, managed-care, behavioral-health, rural-health, and Cardinal Care program updates.",
+          "access_method": "html_page_adapter",
+          "platform": "DMAS HTML press-release listing",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Filtered to healthcare policy/program context; procurement/eVA sources are excluded."
+        },
+        {
+          "source_key": "va_dmas_1115_waiver",
+          "source_name": "Virginia DMAS 1115 Demonstration Waiver Notices",
+          "target_url": "https://www.dmas.virginia.gov/about-us/1115-demonstration-waiver/",
+          "target_api": "Implemented conservative table parser for dated 1115 demonstration waiver public-hearing/public-notice rows and linked official PDFs.",
+          "access_method": "html_page_adapter",
+          "platform": "DMAS waiver public-notice page",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "medium",
+          "notes": "Rows are accepted only when the page exposes a date and waiver/public-hearing context."
         }
       ]
     },
