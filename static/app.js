@@ -1,9 +1,18 @@
 const state = {
   opportunities: [],
   selectedId: null,
+  category: "all",
 };
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const categoryTabs = [
+  ["all", "All"],
+  ["state_opportunities", "State opportunities"],
+  ["federal_opportunities", "Federal opportunities"],
+  ["grants", "Grants"],
+  ["competitor_signals", "Competitor signals"],
+  ["contract_expirations", "Contract expirations"],
+];
 
 const els = {
   metrics: document.querySelector("#metrics"),
@@ -15,11 +24,12 @@ const els = {
   score: document.querySelector("#scoreFilter"),
   sources: document.querySelector("#sourcesList"),
   rules: document.querySelector("#rulesList"),
-  refresh: document.querySelector("#refreshButton"),
+  tabs: document.querySelector("#categoryTabs"),
 };
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -62,23 +72,46 @@ function statusClass(status) {
   return "status";
 }
 
-function filteredOpportunities() {
+function matchesToolbarFilters(opportunity) {
   const query = els.search.value.trim().toLowerCase();
   const status = els.status.value;
   const minScore = Number(els.score.value || 0);
+  const haystack = [
+    opportunity.title,
+    opportunity.state,
+    opportunity.agency,
+    opportunity.program_focus.join(" "),
+    opportunity.keywords_matched.join(" "),
+  ].join(" ").toLowerCase();
+  return (!query || haystack.includes(query))
+    && (!status || opportunity.status === status)
+    && opportunity.fit_score >= minScore;
+}
 
-  return state.opportunities.filter((opportunity) => {
-    const haystack = [
-      opportunity.title,
-      opportunity.state,
-      opportunity.agency,
-      opportunity.program_focus.join(" "),
-      opportunity.keywords_matched.join(" "),
-    ].join(" ").toLowerCase();
-    return (!query || haystack.includes(query))
-      && (!status || opportunity.status === status)
-      && opportunity.fit_score >= minScore;
-  });
+function filteredOpportunities() {
+  return state.opportunities.filter((opportunity) =>
+    matchesToolbarFilters(opportunity)
+      && (state.category === "all" || opportunity.categories.includes(state.category))
+  );
+}
+
+function renderCategoryTabs() {
+  const toolbarMatches = state.opportunities.filter(matchesToolbarFilters);
+  els.tabs.innerHTML = categoryTabs.map(([value, label]) => {
+    const count = value === "all"
+      ? toolbarMatches.length
+      : toolbarMatches.filter((item) => item.categories.includes(value)).length;
+    return `
+      <button
+        type="button"
+        class="category-tab ${state.category === value ? "active" : ""}"
+        data-category="${value}"
+        aria-pressed="${state.category === value}"
+      >
+        ${label}<span>${count}</span>
+      </button>
+    `;
+  }).join("");
 }
 
 function renderMetrics() {
@@ -98,20 +131,27 @@ function renderMetrics() {
 function renderTable() {
   const rows = filteredOpportunities();
   els.count.textContent = `${rows.length} shown`;
-  els.rows.innerHTML = rows.map((opportunity) => `
+  els.rows.innerHTML = rows.length ? rows.map((opportunity) => `
     <tr data-id="${escapeHtml(opportunity.id)}" class="${opportunity.id === state.selectedId ? "selected" : ""}">
       <td>
         <div class="title-cell">
           <strong>${escapeHtml(opportunity.title)}</strong>
-          <span>${escapeHtml(opportunity.agency)} | ${escapeHtml(opportunity.document_type)}</span>
+          <span>${escapeHtml(opportunity.agency)} | ${escapeHtml(opportunity.source)}</span>
         </div>
       </td>
+      <td><span class="badge category-badge">${escapeHtml(opportunity.category_label)}</span></td>
       <td>${escapeHtml(opportunity.state)}</td>
       <td>${formatDate(opportunity.due_date)}</td>
       <td><span class="badge ${scoreClass(opportunity.fit_score)}">${opportunity.fit_score}</span></td>
       <td><span class="badge ${statusClass(opportunity.status)}">${escapeHtml(opportunity.status)}</span></td>
     </tr>
-  `).join("");
+  `).join("") : `
+    <tr class="empty-row">
+      <td colspan="6">
+        No opportunities match this category and the current Search, Status, and Minimum fit filters.
+      </td>
+    </tr>
+  `;
 }
 
 function renderList(title, values, emptyText) {
@@ -143,11 +183,11 @@ function renderDetail(opportunity) {
       </div>
     </div>
 
-    <div class="action-row">
+    ${opportunity.reviewable ? `<div class="action-row">
       ${["Pursue", "Monitor", "Decline"].map((status) => `
         <button type="button" data-status="${status}" ${opportunity.status === status ? "disabled" : ""}>${status}</button>
       `).join("")}
-    </div>
+    </div>` : `<p class="read-only-note">API-sourced market intelligence is read-only. Review the official source before acting.</p>`}
 
     <p class="summary">${escapeHtml(opportunity.summary)}</p>
 
@@ -156,6 +196,8 @@ function renderDetail(opportunity) {
       <div class="field"><span>Budget</span>${money.format(opportunity.budget_estimate)}</div>
       <div class="field"><span>Eligibility</span>${escapeHtml(opportunity.eligibility)}</div>
       <div class="field"><span>Recommendation</span>${escapeHtml(opportunity.ai_recommendation)}</div>
+      <div class="field"><span>Source category</span>${escapeHtml(opportunity.category_label)}</div>
+      <div class="field"><span>Official record</span>${opportunity.document_url ? `<a href="${escapeHtml(opportunity.document_url)}" target="_blank" rel="noopener">Open source</a>` : "Not available"}</div>
     </div>
 
     <section class="section-block">
@@ -250,21 +292,10 @@ async function renderSourcesAndRules() {
   `).join("");
 }
 
-async function refreshSources() {
-  els.refresh.disabled = true;
-  els.refresh.textContent = "Checking...";
-  try {
-    const result = await api("/api/refresh", { method: "POST", body: "{}" });
-    alert(result.message);
-  } finally {
-    els.refresh.disabled = false;
-    els.refresh.textContent = "Refresh sources";
-  }
-}
-
 async function init() {
   state.opportunities = await api("/api/opportunities");
   state.selectedId = state.opportunities[0]?.id || null;
+  renderCategoryTabs();
   renderMetrics();
   renderTable();
   await renderSourcesAndRules();
@@ -283,8 +314,23 @@ els.detail.addEventListener("click", (event) => {
   if (button) updateStatus(button.dataset.status).catch((error) => alert(error.message));
 });
 
-[els.search, els.status, els.score].forEach((input) => input.addEventListener("input", renderTable));
-els.refresh.addEventListener("click", refreshSources);
+els.tabs.addEventListener("click", (event) => {
+  const tab = event.target.closest("button[data-category]");
+  if (!tab) return;
+  state.category = tab.dataset.category;
+  renderCategoryTabs();
+  renderTable();
+  document.querySelector(".table-wrap").scrollTop = 0;
+});
+
+function renderFilteredView() {
+  renderCategoryTabs();
+  renderTable();
+}
+
+els.search.addEventListener("input", renderFilteredView);
+els.score.addEventListener("input", renderFilteredView);
+els.status.addEventListener("change", renderFilteredView);
 
 init().catch((error) => {
   document.body.innerHTML = `<main><section class="panel"><h1>Unable to load dashboard</h1><p>${escapeHtml(error.message)}</p></section></main>`;

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Federal Records | Rural Health Opportunity Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260723-3">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Policy, data, and market context</p>
+        <h1>Federal Records</h1>
+      </div>
+      <a class="button-link" href="/">Back to opportunities</a>
+    </header>
+
+    <main>
+      <section class="metrics" id="recordMetrics"></section>
+
+      <nav class="category-tabs" id="recordTabs" aria-label="Federal record categories"></nav>
+
+      <section class="toolbar records-toolbar" aria-label="Federal record filters">
+        <label>
+          Search
+          <input id="recordSearch" type="search" placeholder="Title, agency, source, keyword">
+        </label>
+        <label>
+          Published since
+          <input id="recordDate" type="date">
+        </label>
+      </section>
+
+      <section class="workspace">
+        <section class="panel table-panel">
+          <div class="panel-heading">
+            <div>
+              <h2>Useful federal information</h2>
+              <p class="muted">These records provide policy and data context; they are not open bid opportunities.</p>
+            </div>
+            <span id="recordCount"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Record</th>
+                  <th>Category</th>
+                  <th>Published</th>
+                  <th>Relevance</th>
+                </tr>
+              </thead>
+              <tbody id="recordRows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <aside class="panel detail-panel" id="recordDetail">
+          <p class="muted">Select a federal record to review its details.</p>
+        </aside>
+      </section>
+    </main>
+
+    <script src="/static/federal-records.js?v=20260723-3"></script>
+  </body>
+</html>

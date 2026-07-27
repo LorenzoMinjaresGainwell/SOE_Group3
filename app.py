@@ -18,16 +18,31 @@ store = CsvStore(ROOT / "data")
 
 class AppHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
 
+        if path == "/" and parsed.query == "view=records":
+            return self._send_file(STATIC_DIR / "federal-records.html", "text/html")
         if path == "/":
             return self._send_file(STATIC_DIR / "index.html", "text/html")
+        if path == "/records":
+            return self._send_file(STATIC_DIR / "federal-records.html", "text/html")
         if path == "/static/styles.css":
             return self._send_file(STATIC_DIR / "styles.css", "text/css")
         if path == "/static/app.js":
             return self._send_file(STATIC_DIR / "app.js", "application/javascript")
+        if path == "/static/federal-records.js":
+            return self._send_file(STATIC_DIR / "federal-records.js", "application/javascript")
         if path == "/api/opportunities":
             return self._send_json(store.list_opportunities())
+        if path == "/api/federal-records":
+            return self._send_json(store.list_federal_records())
+        if path.startswith("/api/federal-records/"):
+            record_id = path.rsplit("/", 1)[-1]
+            record = store.get_federal_record(record_id)
+            if not record:
+                return self._send_json({"error": "Federal record not found"}, 404)
+            return self._send_json(record)
         if path.startswith("/api/opportunities/"):
             opportunity_id = path.rsplit("/", 1)[-1]
             opportunity = store.get_opportunity(opportunity_id)
@@ -76,6 +91,7 @@ class AppHandler(SimpleHTTPRequestHandler):
         body = json.dumps(payload, indent=2).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Cache-Control", "no-store, max-age=0")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -86,6 +102,8 @@ class AppHandler(SimpleHTTPRequestHandler):
         body = path.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("Pragma", "no-cache")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
