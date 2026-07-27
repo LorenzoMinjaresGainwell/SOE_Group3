@@ -109,6 +109,45 @@ class CsvStoreCategoryTests(unittest.TestCase):
         self.assertEqual(federal_records["register-1"]["record_category"], "policy_regulatory")
         self.assertEqual(federal_records["data-1"]["record_category"], "medicaid_data")
 
+    def test_api_sourced_opportunities_can_be_reviewed_and_pinned(self):
+        self.write_csv("state_opportunities.csv", [
+            {
+                "id": "tx-1", "title": "State RFP", "state": "TX",
+                "agency": "HHSC", "source": "TXSmartBuy", "document_type": "RFP",
+                "relevance_score": "75", "amount": "500", "matched_keywords": "Medicaid",
+            },
+        ])
+
+        opportunity_id = "state-opportunity-tx-1"
+        updated = self.store.update_status(opportunity_id, "Pursue")
+        pinned = self.store.update_pinned(opportunity_id, True)
+
+        self.assertEqual(updated["status"], "Pursue")
+        self.assertTrue(pinned["pinned"])
+        self.assertTrue(pinned["reviewable"])
+
+    def test_sorts_pinned_first_then_by_budget(self):
+        self.write_csv("opportunities.csv", [
+            {
+                "id": "small", "title": "Small", "state": "Federal",
+                "agency": "CMS", "source": "SAM.gov Opportunities API",
+                "document_type": "Solicitation", "fit_score": "100",
+                "budget_estimate": "100", "program_focus": "",
+                "keywords_matched": "", "risks": "",
+            },
+            {
+                "id": "large", "title": "Large", "state": "Federal",
+                "agency": "CMS", "source": "SAM.gov Opportunities API",
+                "document_type": "Solicitation", "fit_score": "10",
+                "budget_estimate": "1000", "program_focus": "",
+                "keywords_matched": "", "risks": "",
+            },
+        ])
+
+        self.assertEqual([row["id"] for row in self.store.list_opportunities()], ["large", "small"])
+        self.store.update_pinned("small", True)
+        self.assertEqual([row["id"] for row in self.store.list_opportunities()], ["small", "large"])
+
 
 if __name__ == "__main__":
     unittest.main()

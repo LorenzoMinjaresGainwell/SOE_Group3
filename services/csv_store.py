@@ -24,6 +24,7 @@ class CsvStore:
         self.sources_path = data_dir / "sources.csv"
         self.scoring_rules_path = data_dir / "scoring_rules.csv"
         self.status_history_path = data_dir / "status_history.csv"
+        self.user_state_path = data_dir / "opportunity_user_state.csv"
 
     def list_opportunities(self) -> list[dict]:
         records = [
@@ -43,9 +44,24 @@ class CsvStore:
             self._normalize_contract(row, is_state=True)
             for row in self._read_rows(self.state_contracts_path)
         )
+        user_states = {
+            row.get("opportunity_id", ""): row
+            for row in self._read_rows(self.user_state_path)
+        }
+        for record in records:
+            user_state = user_states.get(record["id"], {})
+            if user_state.get("status"):
+                record["status"] = user_state["status"]
+            record["pinned"] = self._to_bool(user_state.get("pinned"))
+            record["reviewable"] = True
         return sorted(
             records,
-            key=lambda row: (row.get("fit_score", 0), row.get("due_date", "")),
+            key=lambda row: (
+                row.get("pinned", False),
+                row.get("budget_estimate", 0),
+                row.get("fit_score", 0),
+                row.get("due_date", ""),
+            ),
             reverse=True,
         )
 
@@ -91,25 +107,49 @@ class CsvStore:
         ]
 
     def update_status(self, opportunity_id: str, new_status: str, note: str = "", changed_by: str = "Local User") -> dict | None:
-        rows = self._read_rows(self.opportunities_path)
-        fieldnames = self._fieldnames(self.opportunities_path)
-        updated_row = None
-        old_status = ""
-
-        for row in rows:
-            if row.get("id") == opportunity_id:
-                old_status = row.get("status", "")
-                row["status"] = new_status
-                row["last_updated_at"] = self._now()
-                updated_row = row
-                break
-
-        if updated_row is None:
+        opportunity = self.get_opportunity(opportunity_id)
+        if opportunity is None:
             return None
 
-        self._write_rows(self.opportunities_path, fieldnames, rows)
-        self.append_status_history(opportunity_id, old_status, new_status, changed_by, note)
+        old_status = opportunity.get("status", "")
+        self._update_user_state(opportunity_id, status=new_status)
+        if old_status != new_status:
+            self.append_status_history(opportunity_id, old_status, new_status, changed_by, note)
         return self.get_opportunity(opportunity_id)
+
+    def update_pinned(self, opportunity_id: str, pinned: bool) -> dict | None:
+        if self.get_opportunity(opportunity_id) is None:
+            return None
+        self._update_user_state(opportunity_id, pinned=pinned)
+        return self.get_opportunity(opportunity_id)
+
+    def _update_user_state(
+        self,
+        opportunity_id: str,
+        *,
+        status: str | None = None,
+        pinned: bool | None = None,
+    ) -> None:
+        fieldnames = ["opportunity_id", "status", "pinned", "updated_at"]
+        rows = self._read_rows(self.user_state_path)
+        user_state = next(
+            (row for row in rows if row.get("opportunity_id") == opportunity_id),
+            None,
+        )
+        if user_state is None:
+            user_state = {
+                "opportunity_id": opportunity_id,
+                "status": "",
+                "pinned": "false",
+                "updated_at": "",
+            }
+            rows.append(user_state)
+        if status is not None:
+            user_state["status"] = status
+        if pinned is not None:
+            user_state["pinned"] = "true" if pinned else "false"
+        user_state["updated_at"] = self._now()
+        self._write_rows(self.user_state_path, fieldnames, rows)
 
     def append_status_history(self, opportunity_id: str, from_status: str, to_status: str, changed_by: str, note: str) -> None:
         fieldnames = ["opportunity_id", "from_status", "to_status", "changed_at", "changed_by", "note"]
@@ -324,6 +364,9 @@ class CsvStore:
             return int(float(value or default))
         except ValueError:
             return default
+
+    def _to_bool(self, value: str | None) -> bool:
+        return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
     def _now(self) -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")

@@ -98,6 +98,10 @@ function filteredOpportunities() {
   return state.opportunities.filter((opportunity) =>
     matchesToolbarFilters(opportunity)
       && (state.category === "all" || opportunity.categories.includes(state.category))
+  ).sort((left, right) =>
+    Number(right.pinned) - Number(left.pinned)
+      || right.budget_estimate - left.budget_estimate
+      || right.fit_score - left.fit_score
   );
 }
 
@@ -142,6 +146,7 @@ function renderTable() {
       <td>
         <div class="title-cell">
           <strong>${escapeHtml(opportunity.title)}</strong>
+          ${opportunity.pinned ? `<span class="pinned-label" aria-label="Pinned opportunity">📌 Pinned</span>` : ""}
           <span>${escapeHtml(opportunity.agency)} | ${escapeHtml(opportunity.source)}</span>
         </div>
       </td>
@@ -195,17 +200,24 @@ function renderDetail(opportunity) {
       </div>
     </div>
 
-    ${opportunity.reviewable ? `<div class="action-row">
+    <div class="action-row">
+      <button type="button" class="pin-button ${opportunity.pinned ? "is-pinned" : ""}" data-pinned="${!opportunity.pinned}">
+        ${opportunity.pinned ? "Unpin opportunity" : "Pin opportunity"}
+      </button>
       ${["Pursue", "Monitor", "Decline"].map((status) => `
         <button type="button" data-status="${status}" ${opportunity.status === status ? "disabled" : ""}>${status}</button>
       `).join("")}
-    </div>` : `<p class="read-only-note">API-sourced market intelligence is read-only. Review the official source before acting.</p>`}
+    </div>
 
     <p class="summary">${escapeHtml(opportunity.summary)}</p>
 
     <div class="field-grid">
       <div class="field"><span>Due date</span>${formatDate(opportunity.due_date)}</div>
-      <div class="field"><span>Budget</span>${money.format(opportunity.budget_estimate)}</div>
+      <div class="field"><span>Budget</span>${money.format(opportunity.budget_estimate)}
+        ${opportunity.budget_estimate === 0 && opportunity.state && opportunity.state !== "Federal"
+          ? `<small class="budget-note">This state does not provide public budget information.</small>`
+          : ""}
+      </div>
       <div class="field"><span>Eligibility</span>${escapeHtml(opportunity.eligibility)}</div>
       <div class="field"><span>Recommendation</span>${escapeHtml(opportunity.ai_recommendation)}</div>
       <div class="field"><span>Source category</span>${escapeHtml(opportunity.category_label)}</div>
@@ -287,6 +299,20 @@ async function updateStatus(status) {
   renderDetail(opportunity);
 }
 
+async function updatePinned(pinned) {
+  if (!state.selectedId) return;
+  const opportunity = await api(`/api/opportunities/${encodeURIComponent(state.selectedId)}/pin`, {
+    method: "POST",
+    body: JSON.stringify({ pinned }),
+  });
+  state.opportunities = state.opportunities.map((item) => item.id === opportunity.id ? {
+    ...item,
+    pinned: opportunity.pinned,
+  } : item);
+  renderTable();
+  renderDetail(opportunity);
+}
+
 async function renderSourcesAndRules() {
   const [sources, rules] = await Promise.all([api("/api/sources"), api("/api/scoring-rules")]);
   els.sourceCount.textContent = sources.length;
@@ -353,6 +379,11 @@ els.rows.addEventListener("click", (event) => {
 });
 
 els.detail.addEventListener("click", (event) => {
+  const pinButton = event.target.closest("button[data-pinned]");
+  if (pinButton) {
+    updatePinned(pinButton.dataset.pinned === "true").catch((error) => alert(error.message));
+    return;
+  }
   const button = event.target.closest("button[data-status]");
   if (button) updateStatus(button.dataset.status).catch((error) => alert(error.message));
 });

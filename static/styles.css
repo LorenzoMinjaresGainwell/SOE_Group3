@@ -65,6 +65,29 @@ button:disabled {
   margin: 0.2rem 0 0;
 }
 
+.brand-lockup {
+  align-items: center;
+  display: flex;
+  gap: clamp(1rem, 2.5vw, 1.75rem);
+  min-width: 0;
+}
+
+.brand-logo {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.18);
+  display: block;
+  height: auto;
+  padding: 0.55rem 0.7rem;
+  width: clamp(10rem, 18vw, 14rem);
+}
+
+.brand-title {
+  border-left: 1px solid rgb(255 255 255 / 0.28);
+  min-width: 0;
+  padding-left: clamp(1rem, 2vw, 1.5rem);
+}
+
 .eyebrow {
   color: #a7f3d0;
   font-size: 0.78rem;
@@ -309,6 +332,12 @@ tbody tr.selected {
   color: #667970;
 }
 
+.title-cell .pinned-label {
+  color: #92400e;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
 .badge {
   border-radius: 999px;
   display: inline-flex;
@@ -411,6 +440,19 @@ tbody tr.selected {
 
 .action-row {
   margin: 1rem 0;
+}
+
+.pin-button.is-pinned {
+  background: #fef3c7;
+  border-color: #d97706;
+  color: #92400e;
+}
+
+.budget-note {
+  color: #667970;
+  display: block;
+  font-weight: 500;
+  margin-top: 0.3rem;
 }
 
 .summary {
@@ -540,6 +582,18 @@ tbody tr.selected {
     display: grid;
   }
 
+  .brand-lockup {
+    align-items: flex-start;
+  }
+
+  .brand-logo {
+    width: clamp(8.5rem, 30vw, 11rem);
+  }
+
+  .brand-title {
+    padding-left: 1rem;
+  }
+
   .detail-panel {
     position: static;
   }
@@ -547,5 +601,18 @@ tbody tr.selected {
   .table-panel {
     height: 65vh;
     min-height: 26rem;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand-lockup {
+    display: grid;
+  }
+
+  .brand-title {
+    border-left: 0;
+    border-top: 1px solid rgb(255 255 255 / 0.28);
+    padding-left: 0;
+    padding-top: 0.8rem;
   }
 }
