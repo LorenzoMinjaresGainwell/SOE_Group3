@@ -4,12 +4,18 @@ import importlib
 from pathlib import Path
 from typing import Any, Callable
 
-from services.state_contracts import ca, il, ma, mi, nj, pa, pr, tx
+from services.state_contracts import ak, al, ar, az, ca, co, fl, il, ma, mi, nj, pa, pr, tn, tx, vt, wy
 
 or_contracts = importlib.import_module("services.state_contracts.or")
 
 STATE_CLIENTS = {
+    "AK": ak.fetch_contracts,
+    "AL": al.fetch_contracts,
+    "AR": ar.fetch_contracts,
+    "AZ": az.fetch_contracts,
     "CA": ca.fetch_contracts,
+    "CO": co.fetch_contracts,
+    "FL": fl.fetch_contracts,
     "IL": il.fetch_contracts,
     "MA": ma.fetch_contracts,
     "MI": mi.fetch_contracts,
@@ -17,7 +23,10 @@ STATE_CLIENTS = {
     "OR": or_contracts.fetch_contracts,
     "PA": pa.fetch_contracts,
     "PR": pr.fetch_contracts,
+    "TN": tn.fetch_contracts,
     "TX": tx.fetch_contracts,
+    "VT": vt.fetch_contracts,
+    "WY": wy.fetch_contracts,
 }
 
 

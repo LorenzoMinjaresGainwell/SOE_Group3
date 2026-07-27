@@ -346,7 +346,22 @@ STATE_CLIENTS.update(
 )
 
 def _register_state_clients() -> None:
-    for state_code, module_name in {"CA": "ca", "OR": "or", "PR": "pr", "VA": "va"}.items():
+    for state_code, module_name in {
+        "AK": "ak",
+        "AL": "al",
+        "AR": "ar",
+        "AZ": "az",
+        "CA": "ca",
+        "CO": "co",
+        "FL": "fl",
+        "OR": "or",
+        "PR": "pr",
+        "SD": "sd",
+        "TN": "tn",
+        "VA": "va",
+        "VT": "vt",
+        "WY": "wy",
+    }.items():
         module = importlib.import_module(f"services.state_updates.{module_name}")
         STATE_CLIENTS[state_code] = module.fetch_updates
 

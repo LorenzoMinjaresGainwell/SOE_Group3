@@ -86,7 +86,7 @@
           "source_key": "al_alabama_buys",
           "source_name": "Alabama Department of Finance RFP Public View",
           "target_url": "https://rfp.alabama.gov/PublicView.aspx",
-          "target_api": "Official Comptroller RFP database Public Access. ASP.NET form POST with ctl00$MyContent$ddlStatus=1 and Search returns 13 Open rows across legacy and STAARS RFP tables. Alabama Buys public solicitation route still redirects to /page.aspx/en/bas/browser_check with Google reCAPTCHA Enterprise.",
+          "target_api": "Official Comptroller RFP database Public Access remains opportunities-only. AlabamaBuys public contract, supplier, and solicitation routes redirect to /page.aspx/en/bas/browser_check with Google reCAPTCHA Enterprise/ivCaptcha; do not bypass. Static current-contract records are handled by al_static_statewide_contract_pdfs from procurement.alabama.gov.",
           "access_method": "html_form_search_table",
           "platform": "Alabama RFP Public View fallback; Alabama Buys blocked",
           "requires_api_key": false,
@@ -98,7 +98,62 @@
             "state_opportunities"
           ],
           "confidence": "high",
-          "notes": "Implemented opportunities adapter from official Finance/Comptroller fallback linked by procurement.alabama.gov and comptroller.alabama.gov/rfp-database/. Alabama Buys remains browser_check/reCAPTCHA blocked from CLI; contracts remain deferred."
+          "notes": "Implemented opportunities adapter from official Finance/Comptroller fallback linked by procurement.alabama.gov and comptroller.alabama.gov/rfp-database/. AlabamaBuys/Ivalua state_contracts routes remain browser-check gated; current statewide vehicle/accessory contract records are implemented separately from official static procurement PDF source al_static_statewide_contract_pdfs."
+        },
+        {
+          "source_key": "al_static_statewide_contract_pdfs",
+          "source_name": "Alabama Procurement Static Statewide Contract PDFs",
+          "platform": "Alabama Procurement static PDFs",
+          "target_url": "https://procurement.alabama.gov/media/5tlmssv4/statewide-vehicle-and-accessory-contract-list.pdf",
+          "target_api": "Official procurement.alabama.gov contract-news/supplier pages exposed 24 static PDF artifacts and no structured XLSX/CSV contract feed in this bounded pass. The accepted Statewide Vehicle and Accessory Contract List PDF exposes master agreement id, supplier/vendor id, statewide owning agency, category/item/line, base pricing, and end date; adapter scans 81 vehicle/accessory PDF rows and normalizes matching vendor/default-keyword rows from the cached PDF text.",
+          "access_method": "static_pdf_adapter",
+          "requires_api_key": false,
+          "confidence": "high",
+          "information_tags": [
+            "contracts",
+            "incumbents",
+            "expiring_contracts"
+          ],
+          "adapter_targets": [
+            "state_contracts"
+          ],
+          "notes": "Implemented services/state_contracts/al.py with services/state_contracts/al_static_pdf.py. Dry-run with Gainwell Technologies scanned 81 vehicle/accessory PDF rows, found 80 rows with contract id + vendor + end date, and returned 0 vendor/default-keyword records because the accepted static source is vehicle/accessory MAs. AlabamaBuys/Ivalua public contract, supplier, and solicitation routes remain browser-check gated."
+        },
+        {
+          "source_key": "al_medicaid_alerts",
+          "source_name": "Alabama Medicaid ALERTs",
+          "target_url": "https://medicaid.alabama.gov/alerts.aspx",
+          "target_api": "Official Alabama Medicaid ALERTs HTML table exposes Date, Title, and alert_detail.aspx?ID links. medicaid.alabama.gov serves an incomplete certificate chain to Python, so the adapter uses a scoped unverified TLS context for this official host only.",
+          "access_method": "html_table_adapter",
+          "platform": "Alabama Medicaid ASP.NET",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/al.py; excludes Alabama RFP Public View and AlabamaBuys procurement routes."
+        },
+        {
+          "source_key": "al_medicaid_proposed_spas",
+          "source_name": "Alabama Medicaid Proposed State Plan Amendments",
+          "target_url": "https://medicaid.alabama.gov/content/9.0_Resources/9.8_State_Plan/9.8.1_Proposed_SPAs.aspx",
+          "target_api": "Official Proposed SPAs page exposes dated Date Filed and Proposed SPA rows with document links.",
+          "access_method": "html_table_adapter",
+          "platform": "Alabama Medicaid ASP.NET",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/al.py for SPA/public-notice records, including rural emergency hospital and reimbursement SPAs where present."
         }
       ]
     },
@@ -107,14 +162,14 @@
       "name": "Alaska",
       "jurisdiction_type": "state",
       "implementation_priority": "medium",
-      "adapter_status": "targeted",
+      "adapter_status": "implemented_partial",
       "aliases": [],
       "sources": [
         {
           "source_key": "ak_online_public_notices",
           "source_name": "Alaska Online Public Notices",
           "target_url": "https://aws.state.ak.us/OnlinePublicNotices/",
-          "target_api": "Official notice search pages; use category/query adapter for procurement and agency notices.",
+          "target_api": "Rejected for state_contracts in this pass: official RSS returned active notices and detail pages, but procurement rows are pre-award solicitations with no vendor/incumbent, while DNR material-sale contract-issuance notices expose applicant/material-sale id and source URL but no stable end/term metadata. Keep as notices/opportunities/policy-update source.",
           "access_method": "html_search_adapter",
           "platform": "Alaska Online Public Notices",
           "requires_api_key": false,
@@ -128,13 +183,13 @@
             "state_updates"
           ],
           "confidence": "medium",
-          "notes": "Good for notices; contract history may require IRIS/VSS or agency pages."
+          "notes": "State_contracts split/rejected. Examples checked: RSS had 100 active items; notice 224602/224578 contract-issuance details exposed APPLICANT and Material Sale Contract id only; notice 224499 was an RFP with proposal due date but no awarded vendor."
         },
         {
           "source_key": "ak_iris_vss",
           "source_name": "Alaska IRIS Vendor Self Service",
           "target_url": "https://iris-vss.alaska.gov/PRDVSS1X1/Advantage4",
-          "target_api": "CGI Advantage/VSS public solicitation and award screens; probe form/XHR endpoints.",
+          "target_api": "State contracts implemented against Alaska IRIS/VSS public Published Solicitations awarded-detail JSON. The public carousel exposes solicitations and detail actions but no viewAwardHistory nav; accepted details expose SRCH_DOC_ID, SO_STA=A, agency, awarded vendor/incumbent lines, title/description, and service start/end dates.",
           "access_method": "vendor_platform_adapter",
           "platform": "CGI Advantage VSS",
           "requires_api_key": false,
@@ -148,8 +203,79 @@
             "state_opportunities",
             "state_contracts"
           ],
+          "confidence": "high",
+          "notes": "Implemented state_contracts adapter services/state_contracts/ak.py from public awarded solicitation details. Alaska Online Public Notices remains notices/opportunities only for contracts: active RSS/search rows include RFP/RFI solicitations without awarded vendor and material-sale contract-issuance notices with applicant/material-sale id but no stable end/term metadata. DOA OPPM procurement pages returned HTTP 403 from CLI."
+        },
+        {
+          "source_key": "ak_medicaid_provider_updates",
+          "source_name": "Alaska Medicaid Provider Updates",
+          "target_url": "https://extranet-sp.dhss.alaska.gov/hcs/medicaidalaska/Provider/Sites/ProviderResources.html",
+          "target_api": "Official Alaska Medicaid provider resources page exposes public Provider/Updates PDF links; adapter uses title/link metadata and PDF Last-Modified/date-in-title when needed.",
+          "access_method": "html_page_adapter",
+          "platform": "Alaska Medicaid public provider resources HTML",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
           "confidence": "medium",
-          "notes": "Secondary target for richer procurement metadata."
+          "notes": "Implemented policy update adapter services/state_updates/ak.py. Alaska Online Public Notices returned Request Rejected from CLI and is not used for update ingestion."
+        },
+        {
+          "source_key": "ak_doh_medicaid_state_plan",
+          "source_name": "Alaska DOH Medicaid State Plan documents",
+          "target_url": "https://health.alaska.gov/en/education/medicaid-state-plan/",
+          "target_api": "Official Alaska Department of Health Medicaid State Plan page with SPA, tribal consultation, and state-plan document links.",
+          "access_method": "html_page_adapter",
+          "platform": "Alaska DOH Umbraco HTML/media library",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter parses dated official document links only; undated landing links are skipped."
+        },
+        {
+          "source_key": "ak_doh_medicaid_coordinated_care",
+          "source_name": "Alaska Medicaid Coordinated Care Initiative documents",
+          "target_url": "https://health.alaska.gov/en/services/alaska-medicaid-coordinated-care/",
+          "target_api": "Official Alaska DOH AMCCI page with dated Medicaid/provider document links including provider notifications, SPA materials, EPSDT, and funding documents.",
+          "access_method": "html_page_adapter",
+          "platform": "Alaska DOH Umbraco HTML/media library",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates",
+            "grants"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter filters to Medicaid/provider-policy context and excludes procurement portals."
+        },
+        {
+          "source_key": "ak_doh_rate_review",
+          "source_name": "Alaska DOH Office of Rate Review Medicaid/rural rate documents",
+          "target_url": "https://health.alaska.gov/en/office-of-the-commissioner/office-of-rate-review/",
+          "target_api": "Official Alaska Office of Rate Review page with Medicaid rate, behavioral-health rate, rural clinic, and hospital document links.",
+          "access_method": "html_page_adapter",
+          "platform": "Alaska DOH Umbraco HTML/media library",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter normalizes dated Medicaid/rural-rate documents as policy/provider updates."
         }
       ]
     },
@@ -194,23 +320,114 @@
         {
           "source_key": "az_app",
           "source_name": "Arizona Procurement Portal",
-          "target_url": "https://app.az.gov/page.aspx/en/rfp/request_browse_public",
-          "target_api": "Arizona Procurement Portal public RFP browse table at /page.aspx/en/rfp/request_browse_public; detail links redirect to browser_check/reCAPTCHA from CLI.",
-          "access_method": "html_table_adapter",
-          "platform": "Arizona Procurement Portal public table",
+          "target_url": "https://app.az.gov/page.aspx/en/ctr/contract_browse_public",
+          "target_api": "Arizona Procurement Portal public RFP browse table remains opportunities source. Public contract browse table at /page.aspx/en/ctr/contract_browse_public exposes current contract rows with contract number, supplier, contract type, effective date, end date, owner, sourcing project, and detail links. The public grid supports normal AJAX pagination at /ajax.aspx/en/ctr/contract_browse_public; GetCount returned 22211 rows and page indexes 0-1480 were reachable without browser_check. Detail pages redirect to /bas/browser_check from CLI.",
+          "access_method": "html_table_ajax_pagination_adapter",
+          "platform": "Arizona Procurement Portal public RFP and contract tables; contract detail pages browser-check gated",
           "requires_api_key": false,
           "information_tags": [
             "opportunities",
             "awards",
             "contracts",
-            "procurement_updates"
+            "procurement_updates",
+            "incumbents",
+            "expiring_contracts"
           ],
           "adapter_targets": [
             "state_opportunities",
             "state_contracts"
           ],
-          "confidence": "medium",
-          "notes": "Implemented opportunities adapter from the public browse table first page; detail pages remain browser-check gated from CLI."
+          "confidence": "high",
+          "notes": "Implemented state_contracts adapter services/state_contracts/az.py from the public contract browse table plus normal grid AJAX pagination. Live probe found 15 rows on page 1, exact public count 22211, and 1481 pages; last page returned 11 rows. Dry-run with Gainwell Technologies scans all public browse rows and filters vendor/default-keyword records. Detail routes remain browser-check gated; adapter does not use opaque hidden-state postback hacks."
+        },
+        {
+          "source_key": "az_ahcccs_news",
+          "source_name": "AHCCCS News and Press Releases",
+          "target_url": "https://www.azahcccs.gov/shared/news.html",
+          "target_api": "Official AHCCCS static dated news grid with title, date, summary, and read-more link metadata.",
+          "access_method": "html_page_adapter",
+          "platform": "AHCCCS static HTML news grid",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates",
+            "grants"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/az.py; includes RHTP, waiver, eligibility, provider, and policy news. Procurement portal rows are excluded."
+        },
+        {
+          "source_key": "az_ahcccs_public_notices",
+          "source_name": "AHCCCS Public Notices",
+          "target_url": "https://www.azahcccs.gov/AHCCCS/PublicNotices/",
+          "target_api": "Official AHCCCS public notices page with public notice, FFS rate, PATH, and policy document links.",
+          "access_method": "html_page_adapter",
+          "platform": "AHCCCS static HTML document list",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter uses dated notice/document titles and links; undated navigation is skipped."
+        },
+        {
+          "source_key": "az_ahcccs_1115_waiver",
+          "source_name": "AHCCCS Section 1115 Waiver Renewal documents",
+          "target_url": "https://www.azahcccs.gov/Resources/Federal/waiverrenewalrequest.html",
+          "target_api": "Official AHCCCS 1115 waiver renewal page with dated waiver documents and public-comment materials.",
+          "access_method": "html_page_adapter",
+          "platform": "AHCCCS static HTML document list",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter normalizes dated 2026 waiver-renewal documents as waiver/public-comment notices."
+        },
+        {
+          "source_key": "az_ahcccs_pharmacy_updates",
+          "source_name": "AHCCCS Pharmacy Updates",
+          "target_url": "https://www.azahcccs.gov/Resources/GuidesManualsPolicies/pharmacyupdates.html",
+          "target_api": "Official AHCCCS pharmacy updates page with PDL, prior-authorization, and contractor notice document links.",
+          "access_method": "html_page_adapter",
+          "platform": "AHCCCS static HTML document list",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter excludes agendas/minutes/testimony and keeps dated provider-policy documents."
+        },
+        {
+          "source_key": "az_ahcccs_rhtp",
+          "source_name": "Arizona Rural Health Transformation Program",
+          "target_url": "https://www.azahcccs.gov/AHCCCS/Initiatives/RHTP/",
+          "target_api": "Official AHCCCS RHTP page with RFA deadline text and RHTP guidance/document links.",
+          "access_method": "html_page_adapter",
+          "platform": "AHCCCS static HTML RHTP page",
+          "requires_api_key": false,
+          "information_tags": [
+            "rht_updates",
+            "grants",
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter treats RHTP grant/application guidance as policy/program updates, not procurement opportunities."
         }
       ]
     },
@@ -224,21 +441,42 @@
       "sources": [
         {
           "source_key": "ar_vendor_services",
-          "source_name": "Arkansas ARBuy Open Bids",
-          "target_url": "https://arbuy.arkansas.gov/bso/view/search/external/advancedSearchBid.xhtml?openBids=true",
-          "target_api": "Official ARBuy BSO public open-bids page linked from SAS Current Solicitations: /bso/view/search/external/advancedSearchBid.xhtml?openBids=true. First page returned 2 public open rows.",
+          "source_name": "Arkansas ARBuy",
+          "target_url": "https://arbuy.arkansas.gov/bso/view/search/external/advancedSearchContractBlanket.xhtml?view=activeContracts",
+          "target_api": "State contracts implemented against official ARBuy BSO active-contracts route /bso/view/search/external/advancedSearchContractBlanket.xhtml?view=activeContracts using shared BSO JSF contract helper; opportunities remain on openBids=true route.",
           "access_method": "vendor_platform_adapter",
           "platform": "ARBuy BSO",
           "requires_api_key": false,
           "information_tags": [
             "opportunities",
-            "procurement_updates"
+            "procurement_updates",
+            "contracts",
+            "incumbents",
+            "expiring_contracts"
           ],
           "adapter_targets": [
-            "state_opportunities"
+            "state_opportunities",
+            "state_contracts"
           ],
           "confidence": "high",
-          "notes": "Catalog Arkansas Vendor Services host is DNS-dead. Official SAS procurement/current solicitations pages link ARBuy BSO open-bids route; implemented opportunities adapter with shared BSO helper. Contracts/awards deferred."
+          "notes": "Implemented services/state_contracts/ar.py. ARBuy active-contracts route returned public contract rows with contract number, supplier, organization, status, begin/end dates, amount, and purchase-order summary URL. Arkansas Vendor Services catalog host remains DNS-dead."
+        },
+        {
+          "source_key": "ar_dhs_dms_events",
+          "source_name": "Arkansas DHS Division of Medical Services Events",
+          "target_url": "https://humanservices.arkansas.gov/category/dms/",
+          "target_api": "Official Arkansas DHS WordPress REST route /wp-json/wp/v2/events?categories=22&per_page=100 exposes DMS event title, posted date, excerpt/content, and event link metadata.",
+          "access_method": "official_portal_json",
+          "platform": "Arkansas DHS WordPress REST",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/ar.py; filters public hearings, proposed rules, ARHOME/HCBS/waiver, provider-manual, DUR, and payment-rate context. ARBuy procurement rows are excluded."
         }
       ]
     },
@@ -314,14 +552,14 @@
       "name": "Colorado",
       "jurisdiction_type": "state",
       "implementation_priority": "high",
-      "adapter_status": "targeted",
+      "adapter_status": "implemented_partial",
       "aliases": [],
       "sources": [
         {
           "source_key": "co_vss",
           "source_name": "Colorado Vendor Self Service",
           "target_url": "https://prd.co.cgiadvantage.com/PRDVSS1X1/Advantage4",
-          "target_api": "Official OSC/SPCO Solicitations page links the ColoradoVSS replacement public CGI Advantage route. Prior catalog host https://codpa-vss.cloud.cgifederal.com/webapp/PRDVSS2X1/AltSelfService is DNS/NXDOMAIN from CLI. Replacement route returned 20 public published-solicitation rows through the existing VSS helper.",
+          "target_api": "State contracts implemented against ColoradoVSS public Published Solicitations awarded-detail JSON from the OSC/SPCO-linked replacement Advantage4 route. The public carousel exposes solicitations/detail actions but no viewAwardHistory nav; accepted details expose SRCH_DOC_ID, SO_STA=A, agency, awarded vendor lines, title/description, and service start/end dates.",
           "access_method": "vendor_platform_adapter",
           "platform": "ColoradoVSS / CGI Advantage VSS",
           "requires_api_key": false,
@@ -336,7 +574,97 @@
             "state_contracts"
           ],
           "confidence": "high",
-          "notes": "Implemented opportunities adapter using official replacement ColoradoVSS route linked from https://osc.colorado.gov/spco/solicitations. Contracts/awards remain separate/deferred."
+          "notes": "Implemented state_contracts adapter services/state_contracts/co.py for ColoradoVSS awarded details. The adapter also scans the official OSC/SPCO State Price Agreement schedule linked from https://osc.colorado.gov/spco/state-price-agreements; latest Gainwell dry-run scanned 209 current agreement rows and found 0 monitored-vendor/keyword matches."
+        },
+        {
+          "source_key": "co_hcpf_provider_bulletins",
+          "source_name": "HCPF Provider Bulletins",
+          "target_url": "https://hcpf.colorado.gov/bulletins",
+          "target_api": "Official HCPF provider bulletin page with monthly Health First Colorado bulletin PDF links and bulletin numbers/dates.",
+          "access_method": "html_page_adapter",
+          "platform": "Colorado HCPF Drupal HTML/media library",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/co.py using browser-like Accept-Language headers required by HCPF CloudFront; no procurement rows ingested."
+        },
+        {
+          "source_key": "co_hcpf_provider_news",
+          "source_name": "HCPF Provider News",
+          "target_url": "https://hcpf.colorado.gov/provider-news",
+          "target_api": "Official HCPF Provider News page with dated Provider News and Resources PDFs and policy/system known-issue notices.",
+          "access_method": "html_page_adapter",
+          "platform": "Colorado HCPF Drupal HTML/media library",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter normalizes dated provider-policy, claims, waiver, pharmacy, and prior-authorization documents."
+        },
+        {
+          "source_key": "co_hcpf_public_notices",
+          "source_name": "HCPF Newsroom Public Notices",
+          "target_url": "https://hcpf.colorado.gov/newsroom",
+          "target_api": "Official HCPF newsroom exposes Medicaid public notices linked to Colorado Secretary of State register URLs with publicationDay dates.",
+          "access_method": "html_page_adapter",
+          "platform": "Colorado HCPF Drupal newsroom plus Colorado SOS register links",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter keeps public-notice/state-plan/rulemaking links only."
+        },
+        {
+          "source_key": "co_hcpf_rhtp",
+          "source_name": "Colorado Rural Health Transformation Program",
+          "target_url": "https://hcpf.colorado.gov/rural-health-transformation-program",
+          "target_api": "Official HCPF RHTP page with RFA deadline, award context, guidance documents, templates, and RHTP newsletter links.",
+          "access_method": "html_page_adapter",
+          "platform": "Colorado HCPF Drupal RHTP page",
+          "requires_api_key": false,
+          "information_tags": [
+            "rht_updates",
+            "grants",
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter normalizes RHTP grant/application guidance and skips vendor partnership list as endorsement-free reference material."
+        },
+        {
+          "source_key": "co_state_price_agreements",
+          "source_name": "Colorado OSC/SPCO State Price Agreements",
+          "target_url": "https://osc.colorado.gov/spco/state-price-agreements",
+          "target_api": "Official OSC/SPCO State Price Agreements page links BIDS category portal and public Google schedule CSV. Schedule rows expose vendor, CORE SPA number, contract number, category/subcategory, effective date, current term expiration date, status, and buyer/admin contact fields.",
+          "access_method": "official_linked_csv",
+          "platform": "Colorado OSC/SPCO BIDS price agreement schedule",
+          "requires_api_key": false,
+          "information_tags": [
+            "contracts",
+            "awards",
+            "incumbents",
+            "expiring_contracts"
+          ],
+          "adapter_targets": [
+            "state_contracts"
+          ],
+          "confidence": "high",
+          "notes": "Implemented inside services/state_contracts/co.py as supplemental current-contract scan. Official page returned 200 with browser UA and linked https://www.bidscolorado.com/co/portal.nsf/xpPriceAgreementsByCategory.xsp plus Google schedule CSV export. Dry-run scanned 209 current rows and returned 0 Gainwell/default-keyword records."
         }
       ]
     },
@@ -444,24 +772,44 @@
       "sources": [
         {
           "source_key": "fl_myfloridamarketplace",
-          "source_name": "MyFloridaMarketPlace Vendor Information Portal",
-          "target_url": "https://vendor.myfloridamarketplace.com/",
-          "target_api": "MFMP VIP public search/download pages for bids and state term contracts.",
-          "access_method": "public_portal_adapter",
-          "platform": "MyFloridaMarketPlace",
+          "source_name": "Florida DMS Contract Search / MyFloridaMarketPlace VIP",
+          "target_url": "https://www.dms.myflorida.com/contract_search",
+          "target_api": "Official Florida DMS Contract Search Next.js page calls https://dms-media.ccplatform.net/api/search_contracts, which returned 79 current contract/agreement rows. Contract detail pages expose number, title, start/end dates, category, documents, and contractor XLSX attachments under /content/download/* with awarded contractor names. MFMP VIP Angular public app remains the bids/vendors source.",
+          "access_method": "official_portal_json",
+          "platform": "Florida DMS Contract Search API and detail pages; MFMP VIP bids/vendors app",
           "requires_api_key": false,
           "information_tags": [
             "opportunities",
             "awards",
             "contracts",
-            "procurement_updates"
+            "procurement_updates",
+            "incumbents",
+            "expiring_contracts"
           ],
           "adapter_targets": [
             "state_opportunities",
             "state_contracts"
           ],
-          "confidence": "medium",
-          "notes": "High-value Medicaid and managed care market."
+          "confidence": "high",
+          "notes": "Implemented state_contracts adapter services/state_contracts/fl.py. Dry-run with Gainwell Technologies scanned 79 current DMS contract/agreement rows, parsed contractor XLSX attachments, and returned 2 records. MFMP VIP /pub/search/bids remains opportunities-only; DMS contract_search is the accepted post-award source."
+        },
+        {
+          "source_key": "fl_ahca_medicaid_alerts",
+          "source_name": "Florida Medicaid Health Care Alerts",
+          "target_url": "https://ahca.myflorida.com/medicaid/florida-medicaid-health-care-alerts/florida-medicaid-health-care-alerts-last-90-days.html",
+          "target_api": "Official AHCA Florida Medicaid Health Care Alerts Last 90 Days and Archive HTML tables expose Date and Subject/link metadata. Some official alert links resolve through AHCA-linked iContact archive URLs.",
+          "access_method": "html_table_adapter",
+          "platform": "Florida AHCA static Medicaid alert tables",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/fl.py; excludes MyFloridaMarketPlace procurement opportunities and uses only AHCA Medicaid alert/public-notice context."
         }
       ]
     },
@@ -1834,10 +2182,10 @@
         {
           "source_key": "sd_procurement_management",
           "source_name": "South Dakota Procurement Management",
-          "target_url": "https://boa.sd.gov/central-services/procurement-management/",
-          "target_api": "Procurement Management bid/contracts pages; probe public listings and document links.",
-          "access_method": "html_table_adapter",
-          "platform": "SD Bureau of Administration",
+          "target_url": "https://open.sd.gov/contracts.aspx",
+          "target_api": "Blocked for state_contracts in CLI: official Open SD Contract/Grant Search page returned 200 with ASP.NET form fields for department/vendor/description/contract number, but repeated broad and targeted POST searches returned empty lbl_Contracts/results. Official BOA procurement contract/award URLs redirect to ServiceNow BHRA SPA; public sp/page JSON is reachable but table/attachment APIs require authentication or expose only templates. ESM postingBoard pastevents returned 1,187 past rows with awardDate/status but no awarded vendor, agency, contract id, or end-date fields; detail endpoints returned 404/problem+json except validateeventvisibility.",
+          "access_method": "manual_probe_required",
+          "platform": "Open SD Contract/Grant Search; SD.gov ServiceNow BHRA; ESM postingBoard past/current events",
           "requires_api_key": false,
           "information_tags": [
             "opportunities",
@@ -1850,7 +2198,61 @@
             "state_contracts"
           ],
           "confidence": "medium",
-          "notes": "Likely HTML/document adapter."
+          "notes": "No state_contracts adapter registered to avoid converting solicitations/award statuses into weak contract records. Existing opportunities adapter remains ESM currentevents only."
+        },
+        {
+          "source_key": "sd_dss_medicaid_provider_communications",
+          "source_name": "South Dakota DSS Medicaid Provider Communications",
+          "target_url": "https://dss.sd.gov/medicaid/providers/communication.aspx",
+          "target_api": "Official DSS Medicaid provider communications page with HTML tables of dated provider communication/bulletin PDF links; adapter keeps current/prior two-year dated documents only.",
+          "access_method": "html_table_adapter",
+          "platform": "South Dakota DSS Medicaid static provider communications tables",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/sd.py. Undated newsletter/manual links are skipped; procurement portals are excluded."
+        },
+        {
+          "source_key": "sd_dss_medicaid_state_plan_amendments",
+          "source_name": "South Dakota DSS Medicaid State Plan Amendments",
+          "target_url": "https://dss.sd.gov/medicaid/medicaidstateplan.aspx",
+          "target_api": "Official DSS Medicaid State Plan page exposes SPA tables with SPA number, description/document link, effective date, public-comment start/end dates, CMS submission date, and approval date.",
+          "access_method": "html_table_adapter",
+          "platform": "South Dakota DSS Medicaid state plan tables",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/sd.py. Includes RHT-related PACT and rural clinic SPA rows where present."
+        },
+        {
+          "source_key": "sd_doh_rural_health_transformation",
+          "source_name": "South Dakota DOH Rural Health Transformation Project",
+          "target_url": "https://doh.sd.gov/healthcare-professionals/rural-health/rural-health-transformation-project/",
+          "target_api": "Official DOH RHT project/resources/press pages plus DOH XML sitemap lastmod metadata for RHT PDFs and press releases.",
+          "access_method": "sitemap_html_page_adapter",
+          "platform": "South Dakota DOH Umbraco pages and XML sitemap",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates",
+            "grants"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/sd.py. Uses official RHT page links and sitemap dates; no procurement portal ingestion."
         }
       ]
     },
@@ -1864,24 +2266,61 @@
       "sources": [
         {
           "source_key": "tn_edison_supplier",
-          "source_name": "Tennessee CPO RFP/RFI/RFQ Opportunities",
-          "target_url": "https://www.tn.gov/generalservices/procurement/central-procurement-office--cpo-/supplier-information/request-for-proposals--rfp--opportunities1.html",
-          "target_api": "Official Tennessee Central Procurement Office public RFP opportunities HTML table. The page returned 76 opportunity rows with document links and event start/response due dates. Edison supplier portal redirects to Oracle IDCS login from CLI.",
-          "access_method": "html_table_adapter",
-          "platform": "Tennessee CPO public RFP opportunities HTML table",
+          "source_name": "Tennessee CPO RFP Opportunities and All Contracts Dashboard",
+          "target_url": "https://www.tn.gov/generalservices/procurement/central-procurement-office--cpo-/contract-information/all-contracts-dashboard.html",
+          "target_api": "Official tn.gov All Contracts Dashboard embeds Tableau view https://data.tn.gov/t/Public/views/CPOContractDetails/CPOContracts-ADACompliant; CSV export with :showVizHome=no exposes contract number, description, contract type, supplier name, begin/expire dates, local-government availability, multiyear flag, and amount, but Supplier Name is capped at 40 characters and Contract Description at 30 characters. Public Tableau .twb/.twbx/.xlsx routes redirect to analytics.sts.tn.gov, which was DNS-unreachable from CLI; stale CPOContracts/CPO-Sample1 CSV/startSession failed; View Data commands returned server errors without initialized client state. Statewide contract listing links redirect to Edison/Oracle IDCS from CLI; RFP opportunities page remains state_opportunities source.",
+          "access_method": "official_portal_json",
+          "platform": "Tennessee CPO public HTML opportunities page plus Tableau CSV all-contracts dashboard; Edison listing gated",
           "requires_api_key": false,
           "information_tags": [
             "opportunities",
             "awards",
             "contracts",
-            "procurement_updates"
+            "procurement_updates",
+            "incumbents",
+            "expiring_contracts"
           ],
           "adapter_targets": [
             "state_opportunities",
             "state_contracts"
           ],
           "confidence": "high",
-          "notes": "Reclassified from PeopleSoft Edison to official tn.gov public opportunities page and implemented. Contracts/awards remain separate/deferred."
+          "notes": "Implemented state_contracts adapter services/state_contracts/tn.py from the official All Contracts Dashboard Tableau CSV export. Quality caveat: 2026-07-27 probe found no safely reachable fuller public Tableau export; accepted ADA CSV still truncates Supplier Name to 40 chars and Contract Description to 30 chars. NV00000000 is dashboard-present but reused on 97 rows, so tn.py keeps source_record_id unique by appending Index. Dry-run with Gainwell Technologies scanned 7,682 amount rows and returned 51 vendor/default-keyword records, including Gainwell Acquisition Corp and Medicaid/MMIS records. Edison statewide listing remains Oracle IDCS login-gated from CLI."
+        },
+        {
+          "source_key": "tn_tenncare_public_notices",
+          "source_name": "TennCare Waiver and State Plan Public Notices",
+          "target_url": "https://www.tn.gov/tenncare/policy-guidelines/waiver-and-state-plan-public-notices.html",
+          "target_api": "Official TennCare public notice page exposes waiver, 1115/1915(c), state-plan, public-comment, QIS, and related document links with date text in title/status blocks.",
+          "access_method": "html_page_adapter",
+          "platform": "TennCare tn.gov static public notice page",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/tn.py; skips supplemental draft/redline links and undated provider news/form landing-page links."
+        },
+        {
+          "source_key": "tn_tenncare_news",
+          "source_name": "TennCare News",
+          "target_url": "https://www.tn.gov/tenncare/news.html",
+          "target_api": "Official TennCare news HTML listing exposes stable /news/YYYY/M/D/ URLs with title/date metadata.",
+          "access_method": "html_page_adapter",
+          "platform": "TennCare tn.gov news listing",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/tn.py for dated TennCare Medicaid/CMS/program news; CPO/Edison procurement routes are excluded."
         }
       ]
     },
@@ -2046,8 +2485,8 @@
         {
           "source_key": "vt_bid_system",
           "source_name": "Vermont Business Registry and Bid System",
-          "target_url": "https://www.vermontbusinessregistry.com/BidSearch.aspx?type=5",
-          "target_api": "Implemented official replacement: Vermont Business Registry home page links BidSearch.aspx?type=5 for Open State Bids; /BidSystem/ returns 404. Listing returned 34 open state rows and public BidPreview.aspx detail pages with closing dates and bidAttachments links.",
+          "target_url": "https://www.vermontbusinessregistry.com/BidSearch.aspx?type=10",
+          "target_api": "Opportunities implemented from BidSearch.aspx?type=5. BidSearch.aspx?type=10 award listing was probed for state_contracts: 49 public award rows and BidPreview.aspx details expose awarded vendor/amount in Special Instructions but lack contract term/end date or clear current-contract status, so the bid-system award route is rejected for contract ingestion.",
           "access_method": "html_search_adapter",
           "platform": "Vermont Bid System",
           "requires_api_key": false,
@@ -2057,13 +2496,116 @@
             "procurement_updates"
           ],
           "adapter_targets": [
-            "state_opportunities",
-            "state_contracts"
+            "state_opportunities"
           ],
-          "confidence": "medium",
-          "notes": "Implemented opportunities adapter services/state_opportunities/vt.py from official Open State Bids listing and public detail/attachment pages. Awards remain separate under type=10.",
+          "confidence": "high",
+          "notes": "services/state_opportunities/vt.py remains opportunities-only. State contracts implemented separately from official BGS current statewide contracts page.",
           "raw_access_method": "html_form_adapter",
           "raw_platform": "Vermont Business Registry ASP.NET Open State Bids listing"
+        },
+        {
+          "source_key": "vt_bgs_statewide_contracts",
+          "source_name": "Vermont BGS Current Statewide Contracts",
+          "target_url": "https://bgs.vermont.gov/purchasing-contracting/contract-info/current",
+          "target_api": "Implemented services/state_contracts/vt.py from official BGS Current Statewide Contracts HTML tables; rows expose contract number, supplier, contract PDF/source URL, and expiration date by category.",
+          "access_method": "html_table_adapter",
+          "platform": "Vermont BGS current statewide contracts HTML tables",
+          "requires_api_key": false,
+          "information_tags": [
+            "contracts",
+            "incumbents",
+            "expiring_contracts"
+          ],
+          "adapter_targets": [
+            "state_contracts"
+          ],
+          "confidence": "high",
+          "notes": "Dry-run scans public BGS current statewide-contract tables and filters by configured vendor terms or monitored keywords."
+        },
+        {
+          "source_key": "vt_medicaid_provider_advisories",
+          "source_name": "Vermont Medicaid Provider Advisories",
+          "target_url": "https://www.vtmedicaid.com/#/advisory",
+          "target_api": "Official Vermont Medicaid Portal public JSON endpoint /api/advisory/ with advisory month/year/date and topic metadata.",
+          "access_method": "official_portal_json",
+          "platform": "Vermont Medicaid Portal public JSON",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/vt.py for current/prior-year advisories. DVHA links the portal from provider resources."
+        },
+        {
+          "source_key": "vt_medicaid_provider_banners",
+          "source_name": "Vermont Medicaid Provider Notices and Banners",
+          "target_url": "https://www.vtmedicaid.com/#/home",
+          "target_api": "Official Vermont Medicaid Portal public JSON endpoint /api/banner/ with provider notice date, topic, group, and body metadata.",
+          "access_method": "official_portal_json",
+          "platform": "Vermont Medicaid Portal public JSON",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/vt.py with Medicaid/provider-policy keyword/context filtering; procurement rows are excluded."
+        },
+        {
+          "source_key": "vt_dvha_news_rss",
+          "source_name": "DVHA News RSS Feed",
+          "target_url": "https://dvha.vermont.gov/taxonomy/term/1/feed",
+          "target_api": "Official DVHA RSS feed exposes pubDate, title, link, and description for recent DVHA news.",
+          "access_method": "rss_feed_adapter",
+          "platform": "DVHA Drupal RSS",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/vt.py. Filtered to Medicaid/provider/policy context."
+        },
+        {
+          "source_key": "vt_ahs_hcar_proposed_rules",
+          "source_name": "AHS HCAR Proposed Medicaid Rules",
+          "target_url": "https://humanservices.vermont.gov/rules-policies/health-care-rules/health-care-administrative-rules-hcar/proposed-rules",
+          "target_api": "Official AHS HCAR proposed-rule page with public PDF links; adapter uses PDF or page Last-Modified dates.",
+          "access_method": "html_page_adapter",
+          "platform": "Vermont AHS Drupal rule page",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "medium",
+          "notes": "Implemented services/state_updates/vt.py. Global Commitment Register candidate links returned 404 from CLI and were rejected."
+        },
+        {
+          "source_key": "vt_ahs_hbee_proposed_rules",
+          "source_name": "AHS HBEE Proposed Medicaid Eligibility Rules",
+          "target_url": "https://humanservices.vermont.gov/rules-policies/health-care-rules/health-benefits-eligibility-and-enrollment-rules-hbee",
+          "target_api": "Official AHS HBEE page with proposed Medicaid eligibility/enrollment rule PDF links; adapter uses PDF or page Last-Modified dates.",
+          "access_method": "html_page_adapter",
+          "platform": "Vermont AHS Drupal rule page",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "medium",
+          "notes": "Implemented services/state_updates/vt.py for proposed HBEE rule PDFs only; adopted/undated historical rules are not ingested."
         }
       ]
     },
@@ -2255,7 +2797,7 @@
           "source_key": "wy_procurement",
           "source_name": "Wyoming Procurement and Public Purchase",
           "target_url": "https://ai.wyo.gov/divisions/general-services/purchasing/bid-opportunities",
-          "target_api": "Official Wyoming bid page links to Public Purchase publicInfo listing https://www.publicpurchase.com/gems/wyominggsd,wy/buyer/public/publicInfo; bidView detail pages return login/401 from CLI.",
+          "target_api": "Official Wyoming bid page links Public Purchase publicInfo and publicClosedBidsInfo. publicInfo/publicClosedBidsInfo are solicitation listings; bidView detail pages remain login-gated from CLI and public rows do not expose awarded vendor plus contract/end-date metadata, so Public Purchase is opportunities-only.",
           "access_method": "vendor_platform_adapter",
           "platform": "Public Purchase",
           "requires_api_key": false,
@@ -2265,11 +2807,80 @@
             "procurement_updates"
           ],
           "adapter_targets": [
-            "state_opportunities",
+            "state_opportunities"
+          ],
+          "confidence": "high",
+          "notes": "Existing opportunities adapter remains Public Purchase publicInfo only. State contracts implemented separately from official All Agency Contracts Google Sheet linked on the Wyoming A&I purchasing page."
+        },
+        {
+          "source_key": "wy_all_agency_contracts",
+          "source_name": "Wyoming All Agency Contracts",
+          "target_url": "https://ai.wyo.gov/divisions/general-services/purchasing/all-agency-contracts",
+          "target_api": "Implemented services/state_contracts/wy.py from official Wyoming A&I All Agency Contracts page linked Google Sheet; public gviz CSV exposes category, vendor, vendor email, website, contract number, expiration date, and buyer.",
+          "access_method": "official_portal_json",
+          "platform": "Wyoming A&I Google Sites page plus public Google Sheets CSV export",
+          "requires_api_key": false,
+          "information_tags": [
+            "contracts",
+            "incumbents",
+            "expiring_contracts"
+          ],
+          "adapter_targets": [
             "state_contracts"
           ],
-          "confidence": "medium",
-          "notes": "Catalog /for-vendors URL returned 404. Implemented opportunities adapter against Public Purchase publicInfo listing; detail pages are login-gated."
+          "confidence": "high",
+          "notes": "Dry-run scans official public sheet rows and filters by configured vendor terms or monitored keywords."
+        },
+        {
+          "source_key": "wy_medicaid_provider_newsletters",
+          "source_name": "Wyoming Medicaid Provider Newsletters",
+          "target_url": "https://www.wymedicaid.org/content/wymedicaid/en",
+          "target_api": "Official Wyoming Medicaid public provider portal exposes dated newsletter, portal update, cutover, and revalidation PDF links.",
+          "access_method": "html_page_adapter",
+          "platform": "Wyoming Medicaid public provider portal / Adobe Experience Manager",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Implemented services/state_updates/wy.py. WDH health.wyo.gov WordPress routes returned Cloudflare block pages from CLI and are not ingested."
+        },
+        {
+          "source_key": "wy_medicaid_pdl_updates",
+          "source_name": "Wyoming Medicaid Preferred Drug Lists",
+          "target_url": "https://www.wymedicaid.org/content/wymedicaid/en/pa-pdl/preferred-drug-lists",
+          "target_api": "Official Wyoming Medicaid provider portal page with dated PDL effective-date document links.",
+          "access_method": "html_page_adapter",
+          "platform": "Wyoming Medicaid public provider portal / Adobe Experience Manager",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter normalizes current PDL effective-date updates as pharmacy/provider guidance."
+        },
+        {
+          "source_key": "wy_medicaid_provider_manual",
+          "source_name": "Wyoming Medicaid Provider Manual",
+          "target_url": "https://www.wymedicaid.org/content/wymedicaid/en/provider/provider-manual",
+          "target_api": "Official Wyoming Medicaid provider portal page with dated pharmacy services provider manual revisions.",
+          "access_method": "html_page_adapter",
+          "platform": "Wyoming Medicaid public provider portal / Adobe Experience Manager",
+          "requires_api_key": false,
+          "information_tags": [
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_updates"
+          ],
+          "confidence": "high",
+          "notes": "Adapter normalizes dated provider/pharmacy manual updates; undated form links are skipped."
         }
       ]
     }
