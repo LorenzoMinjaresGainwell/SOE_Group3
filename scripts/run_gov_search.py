@@ -32,6 +32,11 @@ def split_csv(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def repo_path(value: str) -> Path:
+    path = Path(value)
+    return path if path.is_absolute() else ROOT / path
+
+
 def load_vendors(path: Path) -> list[str]:
     if not path.exists():
         return []
@@ -66,8 +71,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--sam-ptypes",
         default="",
-        help="optional comma list: u,p,a,r,s,o,g,k,i. Empty means omit ptype filter.",
+        help="optional comma list: o,k,r,p,a,s,u,i or eval. Empty uses core default o,k,r,p.",
     )
+    parser.add_argument("--sam-quota-mode", choices=["cache-only", "live"], default="cache-only")
+    parser.add_argument("--sam-live-budget", type=int, default=0, help="live SAM calls allowed today; default 0")
+    parser.add_argument("--sam-cache-dir", default="data/raw/sam", help="SAM raw cache directory")
+    parser.add_argument("--sam-ledger-path", default="", help="SAM call ledger path; defaults under cache dir")
     parser.add_argument("--env-file", default=".env")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--json", action="store_true", help="print full JSON summary")
@@ -79,6 +88,12 @@ def main() -> int:
     vendors = split_csv(args.vendors)
     vendors.extend(load_vendors(ROOT / args.vendors_file))
     vendors = sorted(set(vendors), key=str.lower)
+
+    sam_cache_dir = repo_path(args.sam_cache_dir)
+    if args.sam_ledger_path:
+        sam_ledger_path = repo_path(args.sam_ledger_path)
+    else:
+        sam_ledger_path = sam_cache_dir / "call_ledger.ndjson"
 
     config = SearchConfig(
         mode=args.mode,
@@ -94,6 +109,10 @@ def main() -> int:
         sam_ptypes=split_csv(args.sam_ptypes),
         dry_run=args.dry_run,
         env_file=ROOT / args.env_file,
+        sam_quota_mode=args.sam_quota_mode,
+        sam_live_budget=args.sam_live_budget,
+        sam_cache_dir=sam_cache_dir,
+        sam_ledger_path=sam_ledger_path,
     )
 
     print(f"mode={config.mode} sources={','.join(config.sources or [])} max_per_source={config.max_per_source}")
@@ -103,6 +122,10 @@ def main() -> int:
         print("usaspending: no CLI vendors; using data/search_parameters.json if configured")
     if config.sam_ptypes:
         print(f"sam_ptypes={','.join(config.sam_ptypes)}")
+    elif "sam" in (config.sources or []):
+        print("sam_ptypes=default(o,k,r,p)")
+    if "sam" in (config.sources or []):
+        print(f"sam_quota_mode={config.sam_quota_mode} sam_live_budget={config.sam_live_budget}")
 
     result = run_gov_search(config, progress=lambda message: print(f"- {message}"))
 
@@ -112,6 +135,10 @@ def main() -> int:
         print(result["message"])
         for source in result["sources"]:
             print(f"{source['source']}: {source['status']} ({source.get('records_found', 0)} records) {source.get('message', '')}")
+            if source.get("ptype_counts"):
+                counts = ",".join(f"{ptype}:{count}" for ptype, count in source["ptype_counts"].items())
+                buckets = ",".join(f"{name}:{count}" for name, count in source.get("notice_bucket_counts", {}).items())
+                print(f"  ptype_counts={counts} notice_buckets={buckets}")
     return 0 if result["status"] == "ok" else 1
 
 

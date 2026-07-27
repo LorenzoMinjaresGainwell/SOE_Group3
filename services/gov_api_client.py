@@ -9,10 +9,13 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from services.sam_cache import DEFAULT_SAM_LEDGER_PATH, DEFAULT_SAM_RAW_CACHE_DIR, RawSAMCache
+from services.sam_quota import SAMLiveCallBlocked, SAMQuotaError, SAMQuotaGuard, policy_from_settings
 from services.usaspending_client import (
     USASpendingConfig,
     VendorSearch,
@@ -48,6 +51,67 @@ OPPORTUNITY_FIELDS = [
     "keywords_matched",
     "risks",
     "summary",
+]
+
+FEDERAL_OPPORTUNITY_FIELDS = [
+    "opportunity_id",
+    "source_key",
+    "sam_notice_id",
+    "solicitation_number",
+    "title",
+    "notice_type",
+    "ptype",
+    "notice_bucket",
+    "record_type",
+    "agency",
+    "subagency",
+    "office",
+    "posted_date",
+    "updated_date",
+    "due_date",
+    "archive_date",
+    "naics",
+    "psc",
+    "set_aside",
+    "place_of_performance_state",
+    "program_focus",
+    "topic_keys",
+    "vendor_keys_mentioned",
+    "lifecycle_status",
+    "importance_score",
+    "score_evidence_json",
+    "document_url",
+    "source_url",
+    "summary",
+    "raw_json",
+    "last_checked_at",
+]
+
+FEDERAL_GRANT_FIELDS = [
+    "grant_id",
+    "opportunity_number",
+    "opportunity_title",
+    "agency",
+    "agency_code",
+    "posted_date",
+    "close_date",
+    "archive_date",
+    "award_ceiling",
+    "award_floor",
+    "estimated_total_program_funding",
+    "expected_awards",
+    "eligibility",
+    "funding_category",
+    "assistance_listing_number",
+    "program_focus",
+    "topic_keys",
+    "rht_flag",
+    "importance_score",
+    "predictive_value_usd",
+    "score_evidence_json",
+    "document_url",
+    "raw_json",
+    "last_checked_at",
 ]
 
 SOURCE_FIELDS = [
@@ -154,6 +218,57 @@ SAM_PTYPE_LABELS = {
     "i": "Intent to Bundle Requirements",
 }
 
+DEFAULT_SAM_PTYPES = ["o", "k", "r", "p"]
+SAM_PTYPE_EVALUATION_SET = ["o", "k", "r", "p", "a", "s", "u", "i"]
+SAM_NOTICE_BUCKETS = {
+    "o": "active_opportunity",
+    "k": "active_opportunity",
+    "r": "early_signal",
+    "p": "early_signal",
+    "a": "award_notice",
+    "s": "market_intel",
+    "u": "market_intel",
+    "i": "market_intel",
+}
+SAM_TARGET_AGENCY_TERMS = [
+    "department of health and human services",
+    "hhs",
+    "centers for medicare",
+    "centers for medicaid",
+    "cms",
+    "health resources and services administration",
+    "hrsa",
+    "administration for community living",
+    "acl",
+    "agency for healthcare research",
+    "ahrq",
+    "centers for disease control",
+    "cdc",
+]
+SAM_HIGH_VALUE_TERMS = {
+    "medicaid",
+    "medicare",
+    "cms",
+    "mmis",
+    "claims",
+    "eligibility",
+    "rural health",
+    "rural health transformation",
+    "critical access hospital",
+}
+SAM_APPROVED_LIVE_PTYPES = {"o", "k", "r", "p", "a"}
+
+GRANTS_FETCH_ENDPOINT = "https://api.grants.gov/v1/api/fetchOpportunity"
+GRANTS_DEFAULT_AGENCIES = "HHS-CMS|HHS-HRSA"
+GRANTS_RHT_TERMS = [
+    "rural health transformation",
+    "rht",
+    "rural health",
+    "rural hospital",
+    "critical access hospital",
+    "frontier",
+]
+
 KEYWORD_WEIGHTS = {
     "rfp": 15,
     "solicitation": 14,
@@ -201,6 +316,11 @@ class SearchConfig:
     dry_run: bool = False
     env_file: Path = ROOT / ".env"
     sam_api_key: str = ""
+    sam_quota_mode: str = "cache-only"
+    sam_live_budget: int = 0
+    sam_cache_dir: Path = DEFAULT_SAM_RAW_CACHE_DIR
+    sam_ledger_path: Path = DEFAULT_SAM_LEDGER_PATH
+    grants_agencies: str = GRANTS_DEFAULT_AGENCIES
 
 
 def refresh_opportunities() -> dict:
@@ -244,6 +364,7 @@ def run_gov_search(config: SearchConfig | None = None, progress: Callable[[str],
                 "records_found": len(records),
                 "message": f"{len(records)} records found",
             }
+            source_summary.update(source_record_summary(source, records))
             all_records.extend(records)
             emit(progress, f"{source}: {len(records)} records")
         except Exception as exc:
@@ -276,14 +397,20 @@ def run_gov_search(config: SearchConfig | None = None, progress: Callable[[str],
             upsert_source_status(config.data_dir, source, source_summary)
 
     if config.dry_run:
-        added = updated = 0
+        added = updated = federal_added = federal_updated = grant_added = grant_updated = 0
     else:
         added, updated = upsert_opportunities(config.data_dir, all_records)
+        federal_added, federal_updated = upsert_federal_opportunities(config.data_dir, all_records)
+        grant_added, grant_updated = upsert_federal_grants(config.data_dir, all_records)
         stamp_source_run_counts(config.data_dir, sources, added, updated)
 
     finished_at = now_iso()
     status = "ok" if all(summary["status"] in {"ok", "skipped"} for summary in source_summaries) else "partial"
     message = f"Gov search complete: {len(all_records)} found, {added} added, {updated} updated."
+    if federal_added or federal_updated:
+        message += f" Federal opportunities: {federal_added} added, {federal_updated} updated."
+    if grant_added or grant_updated:
+        message += f" Federal grants: {grant_added} added, {grant_updated} updated."
     return {
         "status": status,
         "message": message,
@@ -293,61 +420,262 @@ def run_gov_search(config: SearchConfig | None = None, progress: Callable[[str],
         "records_found": len(all_records),
         "opportunities_added": added,
         "opportunities_updated": updated,
+        "federal_opportunities_added": federal_added,
+        "federal_opportunities_updated": federal_updated,
+        "federal_grants_added": grant_added,
+        "federal_grants_updated": grant_updated,
         "dry_run": config.dry_run,
         "sources": source_summaries,
     }
 
 
 def fetch_sam(config: SearchConfig) -> list[dict[str, str]]:
-    if not config.sam_api_key:
-        return []
+    if sam_live_enabled(config) and not config.sam_api_key:
+        raise RuntimeError("SAM_API_KEY not configured for live SAM mode")
 
     start, end = date_window(config, "sam")
     endpoint = SOURCE_META["sam"]["url"]
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
+    ptype_counts: Counter[str] = Counter()
+    vendor_aliases = vendor_aliases_by_key(config.data_dir / "search_parameters.json")
+    keywords = source_keywords(config, "sam")
+    guard = sam_quota_guard(config)
 
-    ptypes = config.sam_ptypes or [""]
-    for chunk_start, chunk_end in yearly_chunks(start, end):
-        for keyword in source_keywords(config, "sam"):
-            for ptype in ptypes:
-                params = {
-                    "api_key": config.sam_api_key,
-                    "limit": str(min(config.max_per_source, 1000)),
-                    "postedFrom": fmt_sam_date(chunk_start),
-                    "postedTo": fmt_sam_date(chunk_end),
-                    "title": keyword,
-                }
-                if ptype:
-                    params["ptype"] = ptype
-                data = http_json(endpoint + "?" + urllib.parse.urlencode(params))
-                for item in data.get("opportunitiesData", []) or []:
-                    record_id = str(item.get("noticeId") or item.get("solicitationNumber") or "")
-                    if not record_id or record_id in seen:
-                        continue
-                    seen.add(record_id)
-                    text = " ".join(str(item.get(key, "")) for key in ("title", "type", "baseType", "fullParentPathName"))
-                    agency = item.get("fullParentPathName") or item.get("department") or "Federal agency"
-                    url = item.get("uiLink") or (f"https://sam.gov/opp/{record_id}/view" if record_id else "")
-                    rows.append(
-                        make_opportunity(
-                            source_key="sam",
-                            source_record_id=record_id,
-                            title=item.get("title") or "Untitled SAM.gov opportunity",
-                            agency=agency,
-                            document_type=item.get("type") or item.get("baseType") or SAM_PTYPE_LABELS.get(ptype, "Opportunity"),
-                            document_url=url,
-                            source_url=endpoint,
-                            posted_date=item.get("postedDate") or "",
-                            due_date=item.get("responseDeadLine") or "",
-                            summary=item.get("description") or item.get("solicitationNumber") or "SAM.gov opportunity metadata.",
-                            budget_estimate=award_amount(item.get("award")),
-                            text_for_score=text,
-                        )
-                    )
-                    if len(rows) >= config.max_per_source:
-                        return rows
+    ptypes = normalize_sam_ptypes(config.sam_ptypes)
+    if sam_live_enabled(config):
+        ptypes = [ptype for ptype in ptypes if ptype in SAM_APPROVED_LIVE_PTYPES]
+    for ptype in ptypes:
+        if ptype_counts[ptype] >= config.max_per_source:
+            continue
+        chunk_start, chunk_end = sam_call_window(config, ptype, start, end)
+        params = {
+            "api_key": config.sam_api_key,
+            "limit": str(min(max(config.max_per_source * 10, config.max_per_source, 1), 1000)),
+            "postedFrom": fmt_sam_date(chunk_start),
+            "postedTo": fmt_sam_date(chunk_end),
+            "ptype": ptype,
+        }
+        try:
+            data = sam_http_json(endpoint, params, config, guard, caller="sam_opportunities")
+        except SAMLiveCallBlocked:
+            continue
+        items = data.get("opportunitiesData", []) if isinstance(data, dict) else []
+        for item in items or []:
+            if not isinstance(item, dict) or not sam_local_match(item, keywords, vendor_aliases):
+                continue
+            record_id = str(item.get("noticeId") or item.get("solicitationNumber") or "")
+            if not record_id or record_id in seen or ptype_counts[ptype] >= config.max_per_source:
+                continue
+            seen.add(record_id)
+            rows.append(make_sam_opportunity(item, ptype, endpoint, vendor_aliases, config.keywords or DEFAULT_KEYWORDS))
+            ptype_counts[ptype] += 1
+        if all(ptype_counts[item] >= config.max_per_source for item in ptypes):
+            return rows
     return rows
+
+
+def sam_live_enabled(config: SearchConfig) -> bool:
+    return str(config.sam_quota_mode).strip().lower() == "live" and config.sam_live_budget > 0
+
+
+def sam_quota_guard(config: SearchConfig) -> SAMQuotaGuard:
+    policy = policy_from_settings(config.sam_quota_mode, config.sam_live_budget, config.sam_ledger_path)
+    cache = RawSAMCache(root=config.sam_cache_dir, ledger_path=config.sam_ledger_path)
+    return SAMQuotaGuard(policy=policy, cache=cache)
+
+
+def sam_call_window(config: SearchConfig, ptype: str, start: dt.date, end: dt.date) -> tuple[dt.date, dt.date]:
+    if not sam_live_enabled(config):
+        return start, end
+    max_days = 90 if ptype in {"o", "k"} else 180
+    return max(start, end - dt.timedelta(days=max_days)), end
+
+
+def sam_local_match(item: dict[str, Any], keywords: list[str], vendor_aliases: dict[str, list[str]]) -> bool:
+    text = sam_opportunity_text(item)
+    hits = keyword_hits(text, keywords)
+    if mentioned_vendor_keys(text, vendor_aliases):
+        return True
+    lower = text.lower()
+    agency_match = any(term in lower for term in SAM_TARGET_AGENCY_TERMS)
+    high_value_match = any(term in lower for term in SAM_HIGH_VALUE_TERMS)
+    return bool(hits and (agency_match or high_value_match))
+
+
+def sam_opportunity_text(item: dict[str, Any]) -> str:
+    return " ".join(
+        str(value or "")
+        for value in [
+            item.get("title"),
+            item.get("type"),
+            item.get("baseType"),
+            item.get("fullParentPathName"),
+            item.get("department"),
+            item.get("subTier"),
+            item.get("subAgency"),
+            item.get("office"),
+            item.get("officeName"),
+            item.get("description"),
+            item.get("naicsCode"),
+            item.get("classificationCode"),
+        ]
+    )
+
+
+def sam_http_json(
+    endpoint: str,
+    params: dict[str, Any],
+    config: SearchConfig,
+    guard: SAMQuotaGuard,
+    caller: str,
+) -> Any:
+    cached = guard.cache.get("GET", endpoint, params)
+    if cached is not None:
+        data = cached_response_json(cached)
+        guard.log_cache_hit("GET", endpoint, params, record_count=sam_record_count(data), caller=caller)
+        return data
+
+    guard.require_live_call("GET", endpoint, params, caller=caller)
+    full_url = endpoint + "?" + urllib.parse.urlencode(params)
+    request = urllib.request.Request(full_url, headers={"Accept": "application/json", "User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=45) as response:
+            response_text = response.read().decode("utf-8")
+            data = json.loads(response_text)
+            guard.cache.put("GET", endpoint, params, None, response.status, response_text, dict(response.headers.items()))
+            guard.log_live_result("GET", endpoint, params, status="live_ok", record_count=sam_record_count(data), caller=caller)
+            return data
+    except urllib.error.HTTPError as exc:
+        body = redact_secret(sanitize_text(exc.read(600).decode("utf-8", "replace")), config.sam_api_key)
+        if exc.code == 429:
+            guard.log_live_result("GET", endpoint, params, status="rate_limited", caller=caller, note="SAM_API_KEY 429")
+            raise SAMQuotaError("SAM_API_KEY 429") from exc
+        guard.log_live_result("GET", endpoint, params, status="http_error", caller=caller, note=f"HTTP {exc.code}")
+        raise RuntimeError(f"HTTP {exc.code} from {sanitize_url(full_url)}: {body}") from exc
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+        message = redact_secret(sanitize_text(str(exc)), config.sam_api_key)
+        guard.log_live_result("GET", endpoint, params, status="live_error", caller=caller, note=message)
+        raise RuntimeError(f"request failed: {message}") from exc
+
+
+def cached_response_json(cached: dict[str, Any]) -> Any:
+    return json.loads(str(cached.get("response_text") or "{}"))
+
+
+def sam_record_count(data: Any) -> int:
+    if not isinstance(data, dict):
+        return 0
+    for key in ("opportunitiesData", "awardSummary", "entityData"):
+        value = data.get(key)
+        if isinstance(value, list):
+            return len(value)
+    total = data.get("totalRecords")
+    return int_or_zero(total)
+
+
+def normalize_sam_ptypes(ptypes: list[str] | None) -> list[str]:
+    raw = ptypes or DEFAULT_SAM_PTYPES
+    normalized: list[str] = []
+    for value in raw:
+        ptype = str(value).strip().lower()
+        if ptype == "eval":
+            normalized.extend(SAM_PTYPE_EVALUATION_SET)
+            continue
+        if ptype in SAM_PTYPE_LABELS and ptype != "g":
+            normalized.append(ptype)
+    return sorted(set(normalized), key=(SAM_PTYPE_EVALUATION_SET + ["g"]).index) or DEFAULT_SAM_PTYPES
+
+
+def make_sam_opportunity(
+    item: dict[str, Any],
+    ptype: str,
+    endpoint: str,
+    vendor_aliases: dict[str, list[str]],
+    keywords: list[str],
+) -> dict[str, str]:
+    record_id = str(item.get("noticeId") or item.get("solicitationNumber") or "").strip()
+    solicitation_number = str(item.get("solicitationNumber") or "").strip()
+    notice_type = str(item.get("type") or item.get("baseType") or SAM_PTYPE_LABELS.get(ptype, "Opportunity"))
+    agency = str(item.get("fullParentPathName") or item.get("department") or "Federal agency")
+    subagency = text_value(item.get("subTier") or item.get("subAgency") or item.get("subTierName"))
+    office = text_value(item.get("office") or item.get("officeName"))
+    url = str(item.get("uiLink") or (f"https://sam.gov/opp/{record_id}/view" if record_id else ""))
+    summary = str(item.get("description") or solicitation_number or "SAM.gov opportunity metadata.")
+    due_date = item.get("responseDeadLine") or item.get("responseDeadline") or ""
+    amount = award_amount(item.get("award"))
+    text = " ".join(
+        str(value)
+        for value in [
+            item.get("title"),
+            notice_type,
+            agency,
+            subagency,
+            office,
+            summary,
+            item.get("naicsCode"),
+            item.get("classificationCode"),
+        ]
+    )
+    hits = keyword_hits(text, keywords)
+    bucket = SAM_NOTICE_BUCKETS.get(ptype, "other")
+    vendor_keys = mentioned_vendor_keys(text, vendor_aliases)
+    score = score_opportunity("sam", notice_type, hits, due_date, amount)
+    last_checked_at = now_iso()
+
+    legacy = make_opportunity(
+        source_key="sam",
+        source_record_id=record_id,
+        title=item.get("title") or "Untitled SAM.gov opportunity",
+        agency=agency,
+        document_type=notice_type,
+        document_url=url,
+        source_url=endpoint,
+        posted_date=item.get("postedDate") or "",
+        due_date=due_date,
+        summary=summary,
+        budget_estimate=amount,
+        text_for_score=text,
+    )
+    legacy.update(
+        {
+            "opportunity_id": stable_id("sam_opportunities", record_id),
+            "source_key": "sam_opportunities",
+            "sam_notice_id": record_id,
+            "solicitation_number": solicitation_number,
+            "notice_type": clean_text(notice_type, 80),
+            "ptype": ptype,
+            "notice_bucket": bucket,
+            "record_type": sam_record_type(ptype),
+            "subagency": clean_text(subagency, 180),
+            "office": clean_text(office, 180),
+            "updated_date": iso_date(item.get("modifiedDate") or item.get("updatedDate") or ""),
+            "archive_date": iso_date(item.get("archiveDate") or ""),
+            "naics": text_value(item.get("naicsCode") or item.get("naics")),
+            "psc": text_value(item.get("classificationCode") or item.get("psc") or item.get("productServiceCode")),
+            "set_aside": text_value(item.get("typeOfSetAsideDescription") or item.get("typeOfSetAside")),
+            "place_of_performance_state": place_of_performance_state(item.get("placeOfPerformance")),
+            "topic_keys": ";".join(normalize_key(hit) for hit in hits),
+            "vendor_keys_mentioned": ";".join(vendor_keys),
+            "lifecycle_status": sam_lifecycle_status(ptype, due_date),
+            "importance_score": str(score),
+            "score_evidence_json": json_compact(
+                {
+                    "ptype": ptype,
+                    "notice_bucket": bucket,
+                    "keyword_hits": hits,
+                    "vendor_keys_mentioned": vendor_keys,
+                    "due_date": iso_date(due_date),
+                    "agency": agency,
+                    "award_amount": amount,
+                }
+            ),
+            "raw_json": json_compact(item),
+            "last_checked_at": last_checked_at,
+        }
+    )
+    legacy["federal_program_focus"] = ";".join(federal_program_focus(hits))
+    return legacy
 
 
 def fetch_grants(config: SearchConfig) -> list[dict[str, str]]:
@@ -355,40 +683,168 @@ def fetch_grants(config: SearchConfig) -> list[dict[str, str]]:
     statuses = "forecasted|posted" if config.mode == "continue" else "forecasted|posted|closed|archived"
     rows: list[dict[str, str]] = []
     seen: set[str] = set()
+    detail_errors = 0
 
     for keyword in source_keywords(config, "grants"):
         payload = {
             "keyword": keyword,
             "oppStatuses": statuses,
-            "rows": min(max(config.max_per_source, 25), 1000),
+            "rows": min(max(config.max_per_source * 2, 25), 1000),
             "startRecordNum": 0,
         }
+        if config.grants_agencies:
+            payload["agencies"] = config.grants_agencies
         data = http_json(endpoint, payload=payload)
         for item in data.get("data", {}).get("oppHits", []) or []:
-            record_id = str(item.get("id") or item.get("number") or "")
+            record_id = str(item.get("id") or item.get("number") or "").strip()
             if not record_id or record_id in seen:
                 continue
             seen.add(record_id)
-            text = " ".join(str(item.get(key, "")) for key in ("title", "agency", "agencyCode", "number"))
-            rows.append(
-                make_opportunity(
-                    source_key="grants",
-                    source_record_id=record_id,
-                    title=item.get("title") or "Untitled grant opportunity",
-                    agency=item.get("agency") or item.get("agencyCode") or "Federal grant agency",
-                    document_type=item.get("oppStatus") or "Grant opportunity",
-                    document_url=f"https://www.grants.gov/search-results-detail/{record_id}",
-                    source_url=endpoint,
-                    posted_date=item.get("openDate") or "",
-                    due_date=item.get("closeDate") or "",
-                    summary="CFDA: " + "; ".join(item.get("cfdaList") or []),
-                    budget_estimate="0",
-                    text_for_score=text,
-                )
-            )
+            try:
+                detail = fetch_grant_detail(record_id)
+            except Exception:
+                detail_errors += 1
+                continue
+            rows.append(make_grant_opportunity(item, detail, endpoint, config.keywords or DEFAULT_KEYWORDS))
             if len(rows) >= config.max_per_source:
                 return rows
+    if seen and not rows and detail_errors:
+        raise RuntimeError(f"fetchOpportunity failed for {detail_errors} Grants.gov search result(s)")
     return rows
+
+
+def fetch_grant_detail(opportunity_id: str) -> dict[str, Any]:
+    data = http_json(GRANTS_FETCH_ENDPOINT, payload={"opportunityId": opportunity_id})
+    detail = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(detail, dict) or not detail.get("id"):
+        message = detail.get("message") if isinstance(detail, dict) else "missing data"
+        raise RuntimeError(f"fetchOpportunity returned no detail for {opportunity_id}: {sanitize_text(str(message))}")
+    return detail
+
+
+def make_grant_opportunity(
+    search_item: dict[str, Any],
+    detail: dict[str, Any],
+    endpoint: str,
+    keywords: list[str],
+) -> dict[str, str]:
+    synopsis = detail.get("synopsis") if isinstance(detail.get("synopsis"), dict) else {}
+    forecast = detail.get("forecast") if isinstance(detail.get("forecast"), dict) else {}
+    section = synopsis or forecast
+    agency_details = first_dict(detail.get("agencyDetails"), section.get("agencyDetails"), detail.get("topAgencyDetails"))
+    top_agency_details = first_dict(detail.get("topAgencyDetails"), section.get("topAgencyDetails"))
+    raw_id = str(detail.get("id") or search_item.get("id") or "").strip()
+    opportunity_number = str(detail.get("opportunityNumber") or search_item.get("number") or "").strip()
+    title = str(detail.get("opportunityTitle") or search_item.get("title") or "Untitled grant opportunity")
+    agency_code = str(section.get("agencyCode") or detail.get("owningAgencyCode") or search_item.get("agencyCode") or "")
+    agency = str(section.get("agencyName") or agency_details.get("agencyName") or search_item.get("agency") or agency_code or "Federal grant agency")
+    posted_date = grants_date(section.get("postingDateStr"), section.get("postingDate"), search_item.get("openDate"))
+    close_date = grants_date(
+        section.get("responseDateStr"),
+        section.get("responseDate"),
+        forecast.get("estApplicationResponseDateStr"),
+        forecast.get("estApplicationResponseDate"),
+        detail.get("originalDueDate"),
+        search_item.get("closeDate"),
+    )
+    archive_date = grants_date(section.get("archiveDateStr"), section.get("archiveDate"))
+    award_ceiling = grant_amount(section.get("awardCeiling"))
+    award_floor = grant_amount(section.get("awardFloor"))
+    estimated_funding = grant_amount(section.get("estimatedFunding"))
+    expected_awards = text_value(section.get("numberOfAwards"))
+    eligibility = grant_eligibility(section)
+    funding_category = grant_descriptions(section.get("fundingActivityCategories"))
+    assistance_listing = grant_assistance_listing(detail, search_item)
+    summary = clean_text(strip_html(section.get("synopsisDesc") or section.get("forecastDesc") or ""), 900)
+    text = " ".join(
+        [
+            title,
+            agency,
+            agency_code,
+            top_agency_details.get("agencyName", ""),
+            summary,
+            eligibility,
+            funding_category,
+            assistance_listing,
+            opportunity_number,
+        ]
+    )
+    grant_keywords = sorted({*keywords, "HHS", "CMS", "HRSA", "critical access hospital"}, key=str.lower)
+    hits = keyword_hits(text, grant_keywords)
+    rht_flag = is_rht_grant(text)
+    focus = federal_program_focus(hits)
+    if rht_flag and "rht" not in focus:
+        focus.append("rht")
+    topic_keys = {normalize_key(hit) for hit in hits}
+    if "HHS-HRSA" in agency_code:
+        topic_keys.add("hrsa")
+    if "HHS-CMS" in agency_code:
+        topic_keys.add("cms")
+    if rht_flag:
+        topic_keys.add("rht")
+    predictive_value = grant_predictive_value(estimated_funding, award_ceiling, expected_awards)
+    score = score_grant(hits, agency_code, rht_flag, close_date, predictive_value, eligibility)
+    document_url = f"https://www.grants.gov/search-results-detail/{raw_id}" if raw_id else "https://www.grants.gov/search-grants"
+    evidence = {
+        "agency_code": agency_code,
+        "top_agency_code": top_agency_details.get("agencyCode") or top_agency_details.get("topAgencyCode") or "",
+        "keyword_hits": hits,
+        "rht_flag": rht_flag,
+        "close_date": close_date,
+        "award_ceiling": award_ceiling,
+        "award_floor": award_floor,
+        "estimated_total_program_funding": estimated_funding,
+        "expected_awards": expected_awards,
+        "funding_category": funding_category,
+        "assistance_listing_number": assistance_listing,
+        "detail_fetched": True,
+    }
+    last_checked_at = now_iso()
+
+    row = make_opportunity(
+        source_key="grants",
+        source_record_id=raw_id or opportunity_number or title,
+        title=title,
+        agency=agency,
+        document_type=search_item.get("oppStatus") or detail.get("docType") or "Grant opportunity",
+        document_url=document_url,
+        source_url=endpoint,
+        posted_date=posted_date,
+        due_date=close_date,
+        summary=summary or f"Assistance listings: {assistance_listing}",
+        budget_estimate=predictive_value or estimated_funding or award_ceiling or "0",
+        text_for_score=text,
+    )
+    row.update(
+        {
+            "grant_id": stable_id("grants", raw_id or opportunity_number or title),
+            "opportunity_number": clean_text(opportunity_number, 80),
+            "opportunity_title": clean_text(title, 260),
+            "agency": clean_text(agency, 180),
+            "agency_code": clean_text(agency_code, 60),
+            "posted_date": posted_date,
+            "close_date": close_date,
+            "archive_date": archive_date,
+            "award_ceiling": award_ceiling,
+            "award_floor": award_floor,
+            "estimated_total_program_funding": estimated_funding,
+            "expected_awards": clean_text(expected_awards, 80),
+            "eligibility": clean_text(eligibility, 1200),
+            "funding_category": clean_text(funding_category, 240),
+            "assistance_listing_number": clean_text(assistance_listing, 240),
+            "program_focus": ";".join(focus),
+            "topic_keys": ";".join(sorted(topic_keys)),
+            "rht_flag": "true" if rht_flag else "false",
+            "importance_score": str(score),
+            "predictive_value_usd": predictive_value,
+            "score_evidence_json": json_compact(evidence),
+            "document_url": document_url,
+            "raw_json": json_compact({"search": search_item, "detail": detail}),
+            "last_checked_at": last_checked_at,
+            "source_key": "grants",
+        }
+    )
+    return row
 
 
 def fetch_federal_register(config: SearchConfig) -> list[dict[str, str]]:
@@ -543,6 +999,214 @@ SOURCE_FETCHERS = {
 }
 
 
+def source_record_summary(source: str, records: list[dict[str, str]]) -> dict[str, Any]:
+    if source == "grants":
+        agency_counts = Counter(row.get("agency_code") or row.get("agency", "") for row in records)
+        return {
+            "agency_counts": dict(sorted((key, count) for key, count in agency_counts.items() if key)),
+            "rht_count": sum(1 for row in records if row.get("rht_flag") == "true"),
+            "close_date_count": sum(1 for row in records if row.get("close_date") or row.get("due_date")),
+            "dollar_field_count": sum(
+                1
+                for row in records
+                if row.get("award_ceiling") or row.get("award_floor") or row.get("estimated_total_program_funding")
+            ),
+        }
+    if source != "sam":
+        return {}
+    ptype_counts = Counter(row.get("ptype", "") for row in records if row.get("ptype"))
+    bucket_counts = Counter(row.get("notice_bucket", "") for row in records if row.get("notice_bucket"))
+    return {
+        "ptype_counts": dict(sorted(ptype_counts.items())),
+        "notice_bucket_counts": dict(sorted(bucket_counts.items())),
+        "default_ptypes": ",".join(DEFAULT_SAM_PTYPES),
+        "non_core_records": sum(count for ptype, count in ptype_counts.items() if ptype not in DEFAULT_SAM_PTYPES),
+    }
+
+
+def text_value(value: Any) -> str:
+    if isinstance(value, dict):
+        for key in ("name", "value", "code", "description", "title"):
+            if value.get(key):
+                return str(value[key])
+        return json_compact(value)
+    if isinstance(value, list):
+        return ";".join(text_value(item) for item in value if text_value(item))
+    return str(value or "")
+
+
+def place_of_performance_state(value: Any) -> str:
+    if not isinstance(value, dict):
+        return ""
+    state = value.get("state") or value.get("stateCode") or value.get("stateName")
+    if isinstance(state, dict):
+        return str(state.get("code") or state.get("name") or "")
+    return str(state or "")
+
+
+def sam_record_type(ptype: str) -> str:
+    if ptype == "a":
+        return "award"
+    if SAM_NOTICE_BUCKETS.get(ptype) == "market_intel":
+        return "intel_notice"
+    return "opportunity"
+
+
+def sam_lifecycle_status(ptype: str, due_date: Any) -> str:
+    if ptype == "a":
+        return "awarded"
+    if SAM_NOTICE_BUCKETS.get(ptype) == "market_intel":
+        return "unknown"
+    due = parse_date(due_date)
+    if due and due < dt.date.today():
+        return "expired"
+    if ptype in {"p", "r"}:
+        return "upcoming"
+    return "active"
+
+
+def federal_program_focus(hits: list[str]) -> list[str]:
+    hit_set = {hit.lower() for hit in hits}
+    focus: list[str] = []
+    if {"medicaid", "mmis", "managed care", "eligibility", "enrollment", "claims"} & hit_set:
+        focus.append("medicaid")
+    if {"medicare", "cms", "quality measures"} & hit_set:
+        focus.append("medicare")
+    if {"rural health", "rural health transformation", "critical access hospital", "telehealth", "workforce"} & hit_set:
+        focus.append("rht")
+    if {"interoperability", "fhir", "prior authorization", "provider data"} & hit_set:
+        focus.append("interoperability")
+    return focus or ["review"]
+
+
+def vendor_aliases_by_key(path: Path) -> dict[str, list[str]]:
+    params = load_search_parameters(path)
+    aliases: dict[str, list[str]] = {}
+    for vendor in vendor_searches(params):
+        key = normalize_key(vendor.name)
+        aliases[key] = sorted({vendor.name, *vendor.queries}, key=str.lower)
+    return aliases
+
+
+def mentioned_vendor_keys(text: str, aliases_by_key: dict[str, list[str]]) -> list[str]:
+    lower = text.lower()
+    keys = [key for key, aliases in aliases_by_key.items() if any(alias.lower() in lower for alias in aliases)]
+    return sorted(set(keys))
+
+
+def normalize_key(value: Any) -> str:
+    return re.sub(r"_+", "_", re.sub(r"[^a-z0-9]+", "_", str(value or "").lower())).strip("_")
+
+
+def json_compact(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+
+
+def first_dict(*values: Any) -> dict[str, Any]:
+    for value in values:
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def grants_date(*values: Any) -> str:
+    for value in values:
+        if not value:
+            continue
+        text = str(value).strip()
+        match = re.match(r"^(\d{4}-\d{2}-\d{2})", text)
+        if match:
+            return match.group(1)
+        parsed = parse_date(text)
+        if parsed:
+            return parsed.isoformat()
+        stripped = re.sub(r"\s+[A-Z]{2,4}$", "", text)
+        for fmt in ("%b %d, %Y %I:%M:%S %p", "%B %d, %Y %I:%M:%S %p", "%b %d, %Y", "%B %d, %Y"):
+            try:
+                return dt.datetime.strptime(stripped, fmt).date().isoformat()
+            except ValueError:
+                pass
+    return ""
+
+
+def grant_amount(value: Any) -> str:
+    text = str(value or "").strip()
+    if not text or text.lower() in {"none", "n/a", "na", "not available", "unknown", "null"}:
+        return ""
+    amount = numeric_amount(text)
+    return str(amount) if amount or re.search(r"\d", text) else ""
+
+
+def grant_descriptions(value: Any) -> str:
+    if isinstance(value, list):
+        items = [text_value(item.get("description") or item.get("name") or item.get("id")) for item in value if isinstance(item, dict)]
+        return "; ".join(item for item in items if item)
+    return text_value(value)
+
+
+def grant_assistance_listing(detail: dict[str, Any], search_item: dict[str, Any]) -> str:
+    numbers = [str(item.get("cfdaNumber")) for item in detail.get("cfdas") or [] if isinstance(item, dict) and item.get("cfdaNumber")]
+    numbers.extend(str(item) for item in search_item.get("cfdaList") or [] if item)
+    return ";".join(sorted(set(numbers)))
+
+
+def grant_eligibility(section: dict[str, Any]) -> str:
+    applicant_types = grant_descriptions(section.get("applicantTypes"))
+    eligibility_desc = strip_html(section.get("applicantEligibilityDesc") or "")
+    return "; ".join(part for part in [applicant_types, eligibility_desc] if part)
+
+
+def strip_html(value: Any) -> str:
+    text = re.sub(r"<[^>]+>", " ", str(value or ""))
+    text = text.replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", '"')
+    return clean_text(text, 5000)
+
+
+def is_rht_grant(text: str) -> bool:
+    lower = text.lower()
+    return any(term in lower for term in GRANTS_RHT_TERMS)
+
+
+def grant_predictive_value(estimated_funding: str, award_ceiling: str, expected_awards: str) -> str:
+    estimated = numeric_amount(estimated_funding)
+    if estimated:
+        return str(estimated)
+    ceiling = numeric_amount(award_ceiling)
+    awards = numeric_amount(expected_awards)
+    if ceiling and awards:
+        return str(ceiling * awards)
+    return str(ceiling) if ceiling else ""
+
+
+def score_grant(hits: list[str], agency_code: str, rht_flag: bool, close_date: str, predictive_value: str, eligibility: str) -> int:
+    score = 20
+    for hit in hits:
+        score += KEYWORD_WEIGHTS.get(hit.lower(), 2)
+    if agency_code.startswith("HHS-CMS") or agency_code.startswith("HHS-HRSA"):
+        score += 15
+    elif agency_code.startswith("HHS"):
+        score += 8
+    if rht_flag:
+        score += 15
+    amount = numeric_amount(predictive_value)
+    if amount >= 5_000_000:
+        score += 10
+    elif amount >= 1_000_000:
+        score += 7
+    elif amount >= 250_000:
+        score += 4
+    close = parse_date(close_date)
+    if close:
+        days = (close - dt.date.today()).days
+        if 0 <= days <= 90:
+            score += 8
+        elif 91 <= days <= 240:
+            score += 4
+    if any(term in eligibility.lower() for term in ("small businesses", "for profit organizations")):
+        score += 4
+    return max(0, min(score, 100))
+
+
 def make_opportunity(
     *,
     source_key: str,
@@ -577,7 +1241,7 @@ def make_opportunity(
         "posted_date": iso_date(posted_date),
         "last_checked_at": now_iso(),
         "last_updated_at": now_iso(),
-        "budget_estimate": str(int(float(budget_estimate or 0))),
+        "budget_estimate": str(numeric_amount(budget_estimate)),
         "eligibility": "Review Needed",
         "eligibility_reason": eligibility_reason(source_key, document_type),
         "fit_score": str(score),
@@ -611,7 +1275,7 @@ def score_opportunity(source_key: str, document_type: str, hits: list[str], due_
     if "recompete" in text_type:
         score += 18
 
-    amount = int(float(budget_estimate or 0))
+    amount = numeric_amount(budget_estimate)
     if amount >= 1_000_000:
         score += 8
     elif amount >= 250_000:
@@ -653,7 +1317,7 @@ def risk_flags(due_date: Any, budget_estimate: str, document_type: str) -> list[
             risks.append("Short response window")
         elif days < 0 and "contract" not in document_type.lower():
             risks.append("Past deadline")
-    if int(float(budget_estimate or 0)) == 0:
+    if numeric_amount(budget_estimate) == 0:
         risks.append("Budget not explicitly stated")
     if "Dataset" in document_type:
         risks.append("Informational signal, not a direct procurement")
@@ -699,9 +1363,41 @@ def yearly_chunks(start: dt.date, end: dt.date) -> list[tuple[dt.date, dt.date]]
 def source_keywords(config: SearchConfig, source: str) -> list[str]:
     keywords = config.keywords or DEFAULT_KEYWORDS
     if source == "sam":
-        keep = {"medicaid", "medicare", "rural health", "mmis", "eligibility", "claims"}
+        keep = {
+            "medicaid",
+            "medicare",
+            "cms",
+            "mmis",
+            "claims",
+            "eligibility",
+            "enrollment",
+            "managed care",
+            "interoperability",
+            "fhir",
+            "prior authorization",
+            "provider data",
+            "quality measures",
+            "rural health",
+            "rural health transformation",
+            "critical access hospital",
+            "telehealth",
+            "behavioral health",
+            "workforce",
+        }
     elif source == "grants":
-        keep = {"medicaid", "medicare", "cms", "rural health", "rural health transformation", "telehealth", "behavioral health", "workforce"}
+        keep = {
+            "medicaid",
+            "medicare",
+            "cms",
+            "hhs",
+            "hrsa",
+            "rural health",
+            "rural health transformation",
+            "critical access hospital",
+            "telehealth",
+            "behavioral health",
+            "workforce",
+        }
     elif source == "federal_register":
         keep = {"medicaid", "medicare", "cms", "rural health", "managed care", "waiver", "1115", "interoperability", "prior authorization", "provider data"}
     elif source in {"medicaid", "cms_provider"}:
@@ -749,6 +1445,86 @@ def upsert_opportunities(data_dir: Path, new_rows: list[dict[str, str]]) -> tupl
 
     rows = sorted(by_id.values(), key=lambda row: (int_or_zero(row.get("fit_score")), row.get("posted_date", "")), reverse=True)
     write_csv(path, OPPORTUNITY_FIELDS, rows)
+    return added, updated
+
+
+def upsert_federal_opportunities(data_dir: Path, new_rows: list[dict[str, str]]) -> tuple[int, int]:
+    path = data_dir / "federal_opportunities.csv"
+    federal_rows = [row for row in new_rows if row.get("source_key") == "sam_opportunities"]
+    if not federal_rows:
+        return 0, 0
+
+    existing_rows = read_csv(path)
+    by_id = {row.get("opportunity_id", ""): row for row in existing_rows if row.get("opportunity_id")}
+    added = 0
+    updated = 0
+
+    for row in federal_rows:
+        opportunity_id = row.get("opportunity_id", "")
+        if not opportunity_id:
+            continue
+        clean_row = {field: row.get(field, "") for field in FEDERAL_OPPORTUNITY_FIELDS}
+        clean_row["program_focus"] = row.get("federal_program_focus") or row.get("program_focus", "")
+        existing = by_id.get(opportunity_id)
+        if existing is None:
+            by_id[opportunity_id] = clean_row
+            added += 1
+            continue
+        if any(existing.get(field, "") != clean_row.get(field, "") for field in FEDERAL_OPPORTUNITY_FIELDS):
+            by_id[opportunity_id] = clean_row
+            updated += 1
+
+    rows = sorted(
+        by_id.values(),
+        key=lambda row: (
+            row.get("notice_bucket") == "active_opportunity",
+            row.get("lifecycle_status") == "active",
+            int_or_zero(row.get("importance_score")),
+            row.get("due_date", ""),
+            row.get("posted_date", ""),
+        ),
+        reverse=True,
+    )
+    write_csv(path, FEDERAL_OPPORTUNITY_FIELDS, rows)
+    return added, updated
+
+
+def upsert_federal_grants(data_dir: Path, new_rows: list[dict[str, str]]) -> tuple[int, int]:
+    path = data_dir / "federal_grants.csv"
+    grant_rows = [row for row in new_rows if row.get("grant_id")]
+    if not grant_rows:
+        return 0, 0
+
+    existing_rows = read_csv(path)
+    by_id = {row.get("grant_id", ""): row for row in existing_rows if row.get("grant_id")}
+    added = 0
+    updated = 0
+
+    for row in grant_rows:
+        grant_id = row.get("grant_id", "")
+        if not grant_id:
+            continue
+        clean_row = {field: row.get(field, "") for field in FEDERAL_GRANT_FIELDS}
+        existing = by_id.get(grant_id)
+        if existing is None:
+            by_id[grant_id] = clean_row
+            added += 1
+            continue
+        if any(existing.get(field, "") != clean_row.get(field, "") for field in FEDERAL_GRANT_FIELDS):
+            by_id[grant_id] = clean_row
+            updated += 1
+
+    rows = sorted(
+        by_id.values(),
+        key=lambda row: (
+            row.get("rht_flag") == "true",
+            int_or_zero(row.get("importance_score")),
+            row.get("close_date", ""),
+            row.get("posted_date", ""),
+        ),
+        reverse=True,
+    )
+    write_csv(path, FEDERAL_GRANT_FIELDS, rows)
     return added, updated
 
 
@@ -842,7 +1618,7 @@ def http_json(url: str, payload: dict[str, Any] | None = None, timeout: int = 45
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
-            body = exc.read(600).decode("utf-8", "replace")
+            body = sanitize_text(exc.read(600).decode("utf-8", "replace"))
             raise RuntimeError(f"HTTP {exc.code} from {sanitize_url(url)}: {body}") from exc
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
             last_error = exc
@@ -931,6 +1707,16 @@ def int_or_zero(value: Any) -> int:
         return 0
 
 
+def numeric_amount(value: Any) -> int:
+    if isinstance(value, (int, float)):
+        return int(float(value))
+    cleaned = re.sub(r"[^0-9.-]", "", str(value or ""))
+    try:
+        return int(float(cleaned or 0))
+    except ValueError:
+        return 0
+
+
 def award_amount(award: Any) -> str:
     if isinstance(award, dict):
         return str(award.get("amount") or award.get("awardAmount") or 0)
@@ -964,6 +1750,16 @@ def sanitize_url(url: str) -> str:
     query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
     redacted = [(key, "REDACTED") if key.lower() in {"api_key", "apikey"} else (key, value) for key, value in query]
     return urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, parsed.path, urllib.parse.urlencode(redacted), parsed.fragment))
+
+
+def redact_secret(text: str, secret: str) -> str:
+    return text.replace(secret, "REDACTED") if secret else text
+
+
+def sanitize_text(text: str) -> str:
+    text = re.sub(r"(?i)(api[_-]?key=)[^&\s\"']+", r"\1REDACTED", text)
+    text = re.sub(r"(?i)(SAM_API_KEY\s*[=:]\s*)[^&\s\"']+", r"\1REDACTED", text)
+    return text
 
 
 def emit(progress: Callable[[str], None] | None, message: str) -> None:

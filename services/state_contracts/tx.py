@@ -10,6 +10,8 @@ import urllib.parse
 import urllib.request
 from typing import Any, Callable
 
+from . import tx_dir
+
 TXSMARTBUY_LIST_URL = "https://www.txsmartbuy.gov/app/extensions/CPA/CPAMain/1.0.0/services/BrowseContracts.Service.ss"
 TXSMARTBUY_DETAIL_URL = "https://www.txsmartbuy.gov/app/extensions/CPA/CPAMain/1.0.0/services/BrowseContracts.Details.Service.ss"
 TXSMARTBUY_SOURCE_URL = "https://www.txsmartbuy.gov/browsecontracts"
@@ -49,6 +51,22 @@ def fetch_contracts(
                 continue
             seen_record_ids.add(record["id"])
             records.append(record)
+
+    try:
+        dir_records = tx_dir.fetch_contracts(
+            vendor_terms=vendor_terms,
+            keywords=keywords,
+            max_per_vendor=max_per_vendor,
+            progress=progress,
+        )
+        emit(progress, f"TX DIR: {len(dir_records)} normalized cooperative contract records")
+        for record in dir_records:
+            if record["id"] in seen_record_ids:
+                continue
+            seen_record_ids.add(record["id"])
+            records.append(record)
+    except Exception as exc:
+        emit(progress, f"TX DIR: skipped after TXSmartBuy due to {exc}")
 
     return sorted(records, key=lambda row: (int(row["relevance_score"]), row["end_date"], row["title"]), reverse=True)
 
@@ -102,12 +120,16 @@ def build_record(
     recompete = recompete_signal(months)
     score = relevance_score(matched, recompete, title, vendor_name)
     source_record_id = f"{row_kind}-{line_id}"
+    parent_id = contract_id or contract_number
+    record_type = "dealer_line" if row_kind == "dealer" else "parent_contract"
 
     return {
         "id": f"txsmartbuy-{source_record_id}",
         "state": "TX",
         "source": TXSMARTBUY_SOURCE_NAME,
         "source_record_id": source_record_id,
+        "parent_id": parent_id,
+        "contract_record_type": record_type,
         "vendor_name": vendor_name,
         "vendor_query": query,
         "agency": "Texas Comptroller of Public Accounts",
@@ -124,7 +146,7 @@ def build_record(
         "source_url": TXSMARTBUY_SOURCE_URL,
         "matched_keywords": ";".join(matched),
         "relevance_score": str(score),
-        "raw_json": json.dumps({"row": row, "detail": detail}, ensure_ascii=False, sort_keys=True),
+        "raw_json": json.dumps({"row": row, "detail": detail}, ensure_ascii=True, sort_keys=True, separators=(",", ":")),
         "last_checked_at": now_iso(),
     }
 

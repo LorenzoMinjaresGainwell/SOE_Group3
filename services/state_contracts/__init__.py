@@ -1,12 +1,22 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 from typing import Any, Callable
 
-from services.state_contracts import pa, tx
+from services.state_contracts import ca, il, ma, mi, nj, pa, pr, tx
+
+or_contracts = importlib.import_module("services.state_contracts.or")
 
 STATE_CLIENTS = {
+    "CA": ca.fetch_contracts,
+    "IL": il.fetch_contracts,
+    "MA": ma.fetch_contracts,
+    "MI": mi.fetch_contracts,
+    "NJ": nj.fetch_contracts,
+    "OR": or_contracts.fetch_contracts,
     "PA": pa.fetch_contracts,
+    "PR": pr.fetch_contracts,
     "TX": tx.fetch_contracts,
 }
 

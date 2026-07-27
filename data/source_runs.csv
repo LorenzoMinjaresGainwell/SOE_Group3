@@ -1,0 +1,2 @@
+source,mode,last_successful_run,started_at,finished_at,status,records_found,records_added,records_updated,message
+sam,historic,2026-07-26T14:18:24Z,2026-07-26T14:18:09Z,2026-07-26T14:18:24Z,ok,21,21,0,21 records found
