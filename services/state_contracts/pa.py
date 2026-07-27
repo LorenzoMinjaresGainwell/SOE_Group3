@@ -126,7 +126,7 @@ def normalize_contract(contract: dict[str, Any], *, vendor_name: str, vendor_que
         "source_url": PA_SOURCE_URL,
         "matched_keywords": ";".join(matched),
         "relevance_score": str(score),
-        "raw_json": json.dumps(contract, ensure_ascii=False, sort_keys=True),
+        "raw_json": json.dumps(contract, ensure_ascii=True, sort_keys=True, separators=(",", ":")),
         "last_checked_at": now_iso(),
     }
 

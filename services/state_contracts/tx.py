@@ -120,12 +120,16 @@ def build_record(
     recompete = recompete_signal(months)
     score = relevance_score(matched, recompete, title, vendor_name)
     source_record_id = f"{row_kind}-{line_id}"
+    parent_id = contract_id or contract_number
+    record_type = "dealer_line" if row_kind == "dealer" else "parent_contract"
 
     return {
         "id": f"txsmartbuy-{source_record_id}",
         "state": "TX",
         "source": TXSMARTBUY_SOURCE_NAME,
         "source_record_id": source_record_id,
+        "parent_id": parent_id,
+        "contract_record_type": record_type,
         "vendor_name": vendor_name,
         "vendor_query": query,
         "agency": "Texas Comptroller of Public Accounts",
@@ -142,7 +146,7 @@ def build_record(
         "source_url": TXSMARTBUY_SOURCE_URL,
         "matched_keywords": ";".join(matched),
         "relevance_score": str(score),
-        "raw_json": json.dumps({"row": row, "detail": detail}, ensure_ascii=False, sort_keys=True),
+        "raw_json": json.dumps({"row": row, "detail": detail}, ensure_ascii=True, sort_keys=True, separators=(",", ":")),
         "last_checked_at": now_iso(),
     }
 
