@@ -1255,7 +1255,7 @@ def write_lifecycle(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = path.with_name(f".{path.name}.tmp")
     with tmp_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=LIFECYCLE_FIELDS, extrasaction="ignore")
+        writer = csv.DictWriter(handle, fieldnames=LIFECYCLE_FIELDS, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
     tmp_path.replace(path)

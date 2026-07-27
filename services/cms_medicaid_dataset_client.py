@@ -1008,6 +1008,6 @@ def emit(progress: Callable[[str], None] | None, message: str) -> None:
 def write_signals(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=SIGNAL_FIELDS, extrasaction="ignore")
+        writer = csv.DictWriter(handle, fieldnames=SIGNAL_FIELDS, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)

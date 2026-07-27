@@ -817,7 +817,7 @@ def sort_catalog_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
 def write_catalog(path: Path, rows: list[dict[str, str]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CATALOG_FIELDS, extrasaction="ignore")
+        writer = csv.DictWriter(handle, fieldnames=CATALOG_FIELDS, extrasaction="ignore", lineterminator="\n")
         writer.writeheader()
         writer.writerows(rows)
 

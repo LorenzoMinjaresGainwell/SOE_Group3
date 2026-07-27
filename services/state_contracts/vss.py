@@ -3,9 +3,11 @@ from __future__ import annotations
 import datetime as dt
 import json
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from services.state_contracts.keyword_context import useful_keyword_match as keyword_context_match
 from services.state_normalization import (
     amount_string,
     clean_text,
@@ -26,6 +28,8 @@ from services.state_opportunities.vss import (
 
 SOLICITATION_DS_NAME = "T1SO_SRCH_QRY"
 AWARD_HISTORY_DS_NAME = "T1R_COMM_HIS"
+VSS_SEARCH_PAUSE_SECONDS = 0.35
+VSS_TRANSIENT_RETRY_DELAYS = (2, 8, 20)
 PSEUDO_VENDOR_NAMES = {
     "",
     "multiple award vendors",
@@ -69,11 +73,29 @@ def fetch_vss_awarded_contracts(
     seen_sources: set[str] = set()
     limit = max(1, max_per_vendor)
 
+    award_history_available: bool | None = None
     for term in unique_terms(vendor_terms):
-        award_rows = search_award_history_rows(config, term)
-        emit(progress, f"{config.state} VSS Award History: vendor={term}: scanned {len(award_rows)} public rows; rejected as purchase-history rows without agency/end date")
+        if award_history_available is False:
+            emit(progress, f"{config.state} VSS Award History: vendor={term}: public nav unavailable; skipped")
+        else:
+            try:
+                award_rows = retry_vss_operation(lambda: search_award_history_rows(config, term))
+            except RuntimeError as exc:
+                if "viewAwardHistory" in str(exc):
+                    award_history_available = False
+                    emit(progress, f"{config.state} VSS Award History: vendor={term}: public nav unavailable; skipped")
+                else:
+                    emit(progress, f"{config.state} VSS Award History: vendor={term}: skipped after {exc}")
+            else:
+                award_history_available = True
+                emit(progress, f"{config.state} VSS Award History: vendor={term}: scanned {len(award_rows)} public rows; rejected as purchase-history rows without agency/end date")
 
-        result = search_published_solicitations(config, term)
+        try:
+            result = retry_vss_operation(lambda: search_published_solicitations(config, term))
+        except RuntimeError as exc:
+            emit(progress, f"{config.state} VSS Published Solicitations: vendor={term}: skipped after {exc}")
+            pause_between_vss_searches()
+            continue
         emit(progress, f"{config.state} VSS Published Solicitations: vendor={term}: scanned {len(result.rows)} public rows")
         accepted = add_awarded_records(
             records,
@@ -87,9 +109,15 @@ def fetch_vss_awarded_contracts(
             limit=limit,
         )
         emit(progress, f"{config.state} VSS Published Solicitations: vendor={term}: normalized {accepted} awarded/current records")
+        pause_between_vss_searches()
 
     for term in unique_terms(keywords):
-        result = search_published_solicitations(config, term)
+        try:
+            result = retry_vss_operation(lambda: search_published_solicitations(config, term))
+        except RuntimeError as exc:
+            emit(progress, f"{config.state} VSS Published Solicitations: keyword={term}: skipped after {exc}")
+            pause_between_vss_searches()
+            continue
         emit(progress, f"{config.state} VSS Published Solicitations: keyword={term}: scanned {len(result.rows)} public rows")
         accepted = add_awarded_records(
             records,
@@ -103,8 +131,31 @@ def fetch_vss_awarded_contracts(
             limit=limit,
         )
         emit(progress, f"{config.state} VSS Published Solicitations: keyword={term}: normalized {accepted} awarded/current records")
+        pause_between_vss_searches()
 
     return sorted(records, key=contract_sort_key, reverse=True)
+
+
+def pause_between_vss_searches() -> None:
+    time.sleep(VSS_SEARCH_PAUSE_SECONDS)
+
+
+def retry_vss_operation(operation: Callable[[], Any]) -> Any:
+    last_error: RuntimeError | None = None
+    for attempt in range(len(VSS_TRANSIENT_RETRY_DELAYS) + 1):
+        try:
+            return operation()
+        except RuntimeError as exc:
+            last_error = exc
+            if not transient_vss_error(exc) or attempt >= len(VSS_TRANSIENT_RETRY_DELAYS):
+                raise
+            time.sleep(VSS_TRANSIENT_RETRY_DELAYS[attempt])
+    raise RuntimeError(str(last_error) if last_error else "VSS operation failed")
+
+
+def transient_vss_error(exc: RuntimeError) -> bool:
+    text = str(exc)
+    return "initial response variable not found" in text or "VSS request failed" in text
 
 
 def add_awarded_records(
@@ -131,7 +182,12 @@ def add_awarded_records(
         if not candidate_awarded_row(row, vendor_query=vendor_query, query_type=query_type):
             continue
 
-        detail = fetch_detail_for_row(config, row, search_result=search_result if index == 0 else None)
+        try:
+            detail = retry_vss_operation(lambda: fetch_detail_for_row(config, row, search_result=search_result if index == 0 else None))
+        except RuntimeError as exc:
+            if not transient_vss_error(exc):
+                raise
+            continue
         if not detail:
             continue
         normalized = normalize_detail_records(
@@ -272,11 +328,11 @@ def normalize_detail_records(
         if not end_date:
             continue
 
-        amount = amount_string(
-            total_by_vendor.get(vendor_key(vendor_name))
-            or line.get("AWARD_CNTRC_AM")
-            or intent_line.get("EST_SVC_CNTRC_AM_VIEW")
-            or service_line.get("CNTRC_AM")
+        amount = first_amount_string(
+            total_by_vendor.get(vendor_key(vendor_name)),
+            line.get("AWARD_CNTRC_AM"),
+            intent_line.get("EST_SVC_CNTRC_AM_VIEW"),
+            service_line.get("CNTRC_AM"),
         )
         execution_date = first_vss_date(line, "AWARD_DT") or first_vss_date(header, "AWARD_DT")
         line_no = clean_text(line.get("DOC_COMMLN_LN_NO") or service_line.get("DOC_COMMLN_LN_NO") or "1", 20)
@@ -294,6 +350,8 @@ def normalize_detail_records(
         )
         matched = keyword_hits(matched_text, keywords)
         if query_type == "keyword" and not term_matches(matched_text, vendor_query):
+            continue
+        if query_type == "keyword" and not useful_keyword_match(matched, matched_text):
             continue
 
         months = months_until(end_date)
@@ -340,6 +398,17 @@ def normalize_detail_records(
     return records
 
 
+def first_amount_string(*values: Any) -> str:
+    zero_amount = ""
+    for value in values:
+        amount = amount_string(value)
+        if amount and int_or_zero(amount) != 0:
+            return amount
+        if amount and not zero_amount:
+            zero_amount = amount
+    return zero_amount
+
+
 def award_lines_from_headers(payload: dict[str, Any]) -> list[dict[str, Any]]:
     lines: list[dict[str, Any]] = []
     for index, row in enumerate(ds_rows(payload, "T30SR_DOC_HDR"), start=1):
@@ -379,6 +448,10 @@ def candidate_awarded_row(row: dict[str, Any], *, vendor_query: str, query_type:
         row_text = " ".join(str(row.get(key) or "") for key in ("DOC_DSCR", "DEPT_NM", "DOC_REF", "DOC_CD_CONCAT", "SO_CAT_CD"))
         return term_matches(row_text, vendor_query)
     return True
+
+
+def useful_keyword_match(matches: list[str], text: str) -> bool:
+    return keyword_context_match(matches, text)
 
 
 def document_id_from_row(row: dict[str, Any]) -> str:

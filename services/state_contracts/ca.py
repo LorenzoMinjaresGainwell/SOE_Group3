@@ -10,6 +10,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Callable
 
+from services.state_contracts.keyword_context import useful_keyword_match as keyword_context_match
 from services.state_normalization import clean_text, compact_raw_json, iso_date, keyword_hits, months_until, stable_id, term_matches
 from services.state_opportunities.peoplesoft import build_inflight_form
 
@@ -336,28 +337,7 @@ def should_fetch_next(counter: tuple[int, int, int] | None, page_rows: list[LpaR
 
 
 def useful_keyword_match(matches: list[str], text: str) -> bool:
-    if not matches:
-        return False
-    generic_terms = {"claims", "eligibility", "enrollment", "workforce"}
-    matched_terms = {match.lower() for match in matches if match}
-    if not matched_terms <= generic_terms:
-        return True
-    context_terms = [
-        "human services",
-        "healthcare",
-        "health care",
-        "medicaid",
-        "medicare",
-        "medical",
-        "health",
-        "hospital",
-        "behavioral",
-        "managed care",
-        "provider",
-        "chip",
-        "mmis",
-    ]
-    return any(term_matches(text, term) for term in context_terms)
+    return keyword_context_match(matches, text)
 
 
 def contract_record_type(contract_type: str) -> str:
