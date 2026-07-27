@@ -1,9 +1,18 @@
 const state = {
   opportunities: [],
   selectedId: null,
+  category: "all",
 };
 
 const money = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+const categoryTabs = [
+  ["all", "All"],
+  ["state_opportunities", "State opportunities"],
+  ["federal_opportunities", "Federal opportunities"],
+  ["grants", "Grants"],
+  ["competitor_signals", "Competitor signals"],
+  ["contract_expirations", "Contract expirations"],
+];
 
 const els = {
   metrics: document.querySelector("#metrics"),
@@ -15,11 +24,14 @@ const els = {
   score: document.querySelector("#scoreFilter"),
   sources: document.querySelector("#sourcesList"),
   rules: document.querySelector("#rulesList"),
-  refresh: document.querySelector("#refreshButton"),
+  tabs: document.querySelector("#categoryTabs"),
+  sourceCount: document.querySelector("#sourceCount"),
+  ruleCount: document.querySelector("#ruleCount"),
 };
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
+    cache: "no-store",
     headers: { "Content-Type": "application/json" },
     ...options,
   });
@@ -62,23 +74,50 @@ function statusClass(status) {
   return "status";
 }
 
-function filteredOpportunities() {
+function refreshClass(label) {
+  return `refresh-${String(label || "").toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+function matchesToolbarFilters(opportunity) {
   const query = els.search.value.trim().toLowerCase();
   const status = els.status.value;
   const minScore = Number(els.score.value || 0);
+  const haystack = [
+    opportunity.title,
+    opportunity.state,
+    opportunity.agency,
+    opportunity.program_focus.join(" "),
+    opportunity.keywords_matched.join(" "),
+  ].join(" ").toLowerCase();
+  return (!query || haystack.includes(query))
+    && (!status || opportunity.status === status)
+    && opportunity.fit_score >= minScore;
+}
 
-  return state.opportunities.filter((opportunity) => {
-    const haystack = [
-      opportunity.title,
-      opportunity.state,
-      opportunity.agency,
-      opportunity.program_focus.join(" "),
-      opportunity.keywords_matched.join(" "),
-    ].join(" ").toLowerCase();
-    return (!query || haystack.includes(query))
-      && (!status || opportunity.status === status)
-      && opportunity.fit_score >= minScore;
-  });
+function filteredOpportunities() {
+  return state.opportunities.filter((opportunity) =>
+    matchesToolbarFilters(opportunity)
+      && (state.category === "all" || opportunity.categories.includes(state.category))
+  );
+}
+
+function renderCategoryTabs() {
+  const toolbarMatches = state.opportunities.filter(matchesToolbarFilters);
+  els.tabs.innerHTML = categoryTabs.map(([value, label]) => {
+    const count = value === "all"
+      ? toolbarMatches.length
+      : toolbarMatches.filter((item) => item.categories.includes(value)).length;
+    return `
+      <button
+        type="button"
+        class="category-tab ${state.category === value ? "active" : ""}"
+        data-category="${value}"
+        aria-pressed="${state.category === value}"
+      >
+        ${label}<span>${count}</span>
+      </button>
+    `;
+  }).join("");
 }
 
 function renderMetrics() {
@@ -98,20 +137,32 @@ function renderMetrics() {
 function renderTable() {
   const rows = filteredOpportunities();
   els.count.textContent = `${rows.length} shown`;
-  els.rows.innerHTML = rows.map((opportunity) => `
+  els.rows.innerHTML = rows.length ? rows.map((opportunity) => `
     <tr data-id="${escapeHtml(opportunity.id)}" class="${opportunity.id === state.selectedId ? "selected" : ""}">
       <td>
         <div class="title-cell">
           <strong>${escapeHtml(opportunity.title)}</strong>
-          <span>${escapeHtml(opportunity.agency)} | ${escapeHtml(opportunity.document_type)}</span>
+          <span>${escapeHtml(opportunity.agency)} | ${escapeHtml(opportunity.source)}</span>
         </div>
+      </td>
+      <td>
+        <span class="badge category-badge">${escapeHtml(opportunity.category_label)}</span>
+        ${opportunity.refresh_label && opportunity.refresh_label !== "Current"
+          ? `<span class="badge refresh-badge ${refreshClass(opportunity.refresh_label)}">${escapeHtml(opportunity.refresh_label)}</span>`
+          : ""}
       </td>
       <td>${escapeHtml(opportunity.state)}</td>
       <td>${formatDate(opportunity.due_date)}</td>
       <td><span class="badge ${scoreClass(opportunity.fit_score)}">${opportunity.fit_score}</span></td>
       <td><span class="badge ${statusClass(opportunity.status)}">${escapeHtml(opportunity.status)}</span></td>
     </tr>
-  `).join("");
+  `).join("") : `
+    <tr class="empty-row">
+      <td colspan="6">
+        No opportunities match this category and the current Search, Status, and Minimum fit filters.
+      </td>
+    </tr>
+  `;
 }
 
 function renderList(title, values, emptyText) {
@@ -135,6 +186,7 @@ function renderDetail(opportunity) {
   els.detail.innerHTML = `
     <div class="detail-header">
       <span class="badge ${scoreClass(opportunity.fit_score)}">${opportunity.fit_score} fit</span>
+      ${opportunity.refresh_label ? `<span class="badge refresh-badge ${refreshClass(opportunity.refresh_label)}">${escapeHtml(opportunity.refresh_label)}</span>` : ""}
       <h2>${escapeHtml(opportunity.title)}</h2>
       <div class="detail-meta">
         <span>${escapeHtml(opportunity.document_type)}</span>
@@ -143,11 +195,11 @@ function renderDetail(opportunity) {
       </div>
     </div>
 
-    <div class="action-row">
+    ${opportunity.reviewable ? `<div class="action-row">
       ${["Pursue", "Monitor", "Decline"].map((status) => `
         <button type="button" data-status="${status}" ${opportunity.status === status ? "disabled" : ""}>${status}</button>
       `).join("")}
-    </div>
+    </div>` : `<p class="read-only-note">API-sourced market intelligence is read-only. Review the official source before acting.</p>`}
 
     <p class="summary">${escapeHtml(opportunity.summary)}</p>
 
@@ -156,6 +208,9 @@ function renderDetail(opportunity) {
       <div class="field"><span>Budget</span>${money.format(opportunity.budget_estimate)}</div>
       <div class="field"><span>Eligibility</span>${escapeHtml(opportunity.eligibility)}</div>
       <div class="field"><span>Recommendation</span>${escapeHtml(opportunity.ai_recommendation)}</div>
+      <div class="field"><span>Source category</span>${escapeHtml(opportunity.category_label)}</div>
+      <div class="field"><span>API comparison</span>${escapeHtml(opportunity.refresh_label || "Not checked yet")}${opportunity.refresh_changed_fields?.length ? `<br><small>Changed: ${escapeHtml(opportunity.refresh_changed_fields.join(", "))}</small>` : ""}</div>
+      <div class="field"><span>Official record</span>${opportunity.document_url ? `<a href="${escapeHtml(opportunity.document_url)}" target="_blank" rel="noopener">Open source</a>` : "Not available"}</div>
     </div>
 
     <section class="section-block">
@@ -234,41 +289,60 @@ async function updateStatus(status) {
 
 async function renderSourcesAndRules() {
   const [sources, rules] = await Promise.all([api("/api/sources"), api("/api/scoring-rules")]);
+  els.sourceCount.textContent = sources.length;
+  els.ruleCount.textContent = rules.length;
   els.sources.innerHTML = sources.map((source) => `
-    <div class="stack-item">
+    <div class="footer-item">
       <strong>${escapeHtml(source.name)}</strong>
-      <p>${escapeHtml(source.state)} | ${escapeHtml(source.type)} | ${escapeHtml(source.status)}</p>
-      <p>${source.opportunities_found} found, checked ${formatDateTime(source.last_checked_at)}</p>
+      <span>${escapeHtml(source.state)} · ${escapeHtml(source.status)} · ${source.opportunities_found} found · ${formatDateTime(source.last_checked_at)}</span>
     </div>
   `).join("");
 
   els.rules.innerHTML = rules.map((rule) => `
-    <div class="stack-item">
-      <strong>${escapeHtml(rule.category)} (${rule.weight})</strong>
-      <p>${escapeHtml(rule.description)}</p>
+    <div class="footer-item">
+      <strong>${escapeHtml(rule.category)} · ${rule.weight}</strong>
+      <span>${escapeHtml(rule.description)}</span>
     </div>
   `).join("");
 }
 
-async function refreshSources() {
-  els.refresh.disabled = true;
-  els.refresh.textContent = "Checking...";
-  try {
-    const result = await api("/api/refresh", { method: "POST", body: "{}" });
-    alert(result.message);
-  } finally {
-    els.refresh.disabled = false;
-    els.refresh.textContent = "Refresh sources";
-  }
-}
-
 async function init() {
+  await startAutoRefresh();
   state.opportunities = await api("/api/opportunities");
   state.selectedId = state.opportunities[0]?.id || null;
+  renderCategoryTabs();
   renderMetrics();
   renderTable();
   await renderSourcesAndRules();
   if (state.selectedId) await selectOpportunity(state.selectedId);
+}
+
+async function startAutoRefresh() {
+  const status = await api("/api/refresh", {
+    method: "POST",
+    body: JSON.stringify({ force: true }),
+  });
+  if (status.running || status.started) pollRefresh();
+}
+
+function pollRefresh() {
+  const timer = setInterval(async () => {
+    try {
+      const status = await api("/api/refresh/status");
+      if (!status.running) {
+        clearInterval(timer);
+        state.opportunities = await api("/api/opportunities");
+        renderCategoryTabs();
+        renderMetrics();
+        renderTable();
+        await renderSourcesAndRules();
+        if (state.selectedId) await selectOpportunity(state.selectedId);
+      }
+    } catch (error) {
+      clearInterval(timer);
+      console.warn("Automatic data refresh status check failed:", error);
+    }
+  }, 3000);
 }
 
 els.rows.addEventListener("click", (event) => {
@@ -283,8 +357,23 @@ els.detail.addEventListener("click", (event) => {
   if (button) updateStatus(button.dataset.status).catch((error) => alert(error.message));
 });
 
-[els.search, els.status, els.score].forEach((input) => input.addEventListener("input", renderTable));
-els.refresh.addEventListener("click", refreshSources);
+els.tabs.addEventListener("click", (event) => {
+  const tab = event.target.closest("button[data-category]");
+  if (!tab) return;
+  state.category = tab.dataset.category;
+  renderCategoryTabs();
+  renderTable();
+  document.querySelector(".table-wrap").scrollTop = 0;
+});
+
+function renderFilteredView() {
+  renderCategoryTabs();
+  renderTable();
+}
+
+els.search.addEventListener("input", renderFilteredView);
+els.score.addEventListener("input", renderFilteredView);
+els.status.addEventListener("change", renderFilteredView);
 
 init().catch((error) => {
   document.body.innerHTML = `<main><section class="panel"><h1>Unable to load dashboard</h1><p>${escapeHtml(error.message)}</p></section></main>`;

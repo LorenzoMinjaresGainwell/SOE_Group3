@@ -1,5 +1,9 @@
 __pycache__/
 *.pyc
 .env
+.env.local
+.env.*.local
 .venv/
 *.log
+data/raw/sam/
+data/raw/state_contracts/tx_dir/

@@ -1,0 +1,88 @@
+{
+  "monitored_keywords": [
+    "Medicaid",
+    "Medicare",
+    "CMS",
+    "MMIS",
+    "claims",
+    "eligibility",
+    "enrollment",
+    "managed care",
+    "interoperability",
+    "FHIR",
+    "prior authorization",
+    "contact center",
+    "provider data",
+    "quality measures",
+    "rural health",
+    "rural health transformation",
+    "critical access hospital",
+    "telehealth",
+    "behavioral health",
+    "workforce"
+  ],
+  "vendors": [
+    {
+      "name": "MAXIMUS",
+      "aliases": ["MAXIMUS FEDERAL SERVICES", "MAXIMUS FEDERAL SERVICES INC"]
+    },
+    {
+      "name": "Gainwell Technologies",
+      "aliases": [
+        "GAINWELL",
+        "GAINWELL TECHNOLOGIES LLC",
+        "HEALTH MANAGEMENT SYSTEMS, INC.",
+        "DXC TECHNOLOGY SERVICES LLC"
+      ]
+    },
+    {
+      "name": "Deloitte",
+      "aliases": ["DELOITTE CONSULTING", "DELOITTE CONSULTING LLP"]
+    },
+    {
+      "name": "Accenture Federal Services",
+      "aliases": ["ACCENTURE FEDERAL SERVICES", "ACCENTURE LLP"]
+    },
+    {
+      "name": "Optum",
+      "aliases": ["OPTUM", "OPTUMSERVE", "OPTUMSERVE TECHNOLOGY SERVICES"]
+    },
+    {
+      "name": "Conduent",
+      "aliases": ["CONDUENT", "CONDUENT STATE HEALTHCARE"]
+    }
+  ],
+  "usaspending": {
+    "award_type_codes": ["A", "B", "C", "D"],
+    "years_back": 20,
+    "max_per_vendor": 100,
+    "page_limit": 100,
+    "min_award_amount": 0,
+    "recompete_months": 36,
+    "near_expiry_months": 18,
+    "only_keyword_matches": false
+  },
+  "state_sources": {
+    "PA": {
+      "contracts": ["openbookpa"],
+      "opportunities": ["emarketplace"]
+    },
+    "TX": {
+      "contracts": ["txsmartbuy", "dir"],
+      "opportunities": ["esbd"]
+    }
+  },
+  "state_contracts": {
+    "vendor_terms_by_group": {
+      "Gainwell Technologies": [
+        "Gainwell",
+        "Gainwell Technologies",
+        "DXC",
+        "DXC MS",
+        "Health Management",
+        "Health Management Systems",
+        "HP Enterprise Services"
+      ]
+    }
+  }
+}

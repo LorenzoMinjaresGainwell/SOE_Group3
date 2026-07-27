@@ -1,0 +1,1551 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-07-24",
+  "source_catalog": "data/state_api_targets.json",
+  "purpose": "Platform-family grouping for state/territory adapter deployment. Groups are implementation hypotheses until a session verifies the actual endpoint/platform.",
+  "fallback_status_values": [
+    "open",
+    "claimed",
+    "in_progress",
+    "blocked",
+    "review_ready",
+    "done",
+    "reclassified",
+    "split_needed",
+    "paused"
+  ],
+  "fallback_protocol": [
+    "Probe the assigned source briefly before writing adapter code.",
+    "If the actual platform differs, stop implementation work for that source.",
+    "Update coord/state_platform_tracker.md under coord/lock with status=reclassified, actual_platform_family, reclassified_to, evidence, and latest_result.",
+    "If changing machine-readable grouping, update data/state_platform_groups.json in the same locked edit and validate JSON.",
+    "Do not force a brittle adapter into the wrong platform family."
+  ],
+  "foundation_helpers_requested": [
+    "services/state_source_catalog.py",
+    "services/state_http.py",
+    "services/state_normalization.py",
+    "services/state_platform_probe.py",
+    "scripts/state_source_catalog.py",
+    "scripts/state_source_probe.py"
+  ],
+  "groups": [
+    {
+      "platform_family": "official_json_existing",
+      "title": "Known official JSON endpoints",
+      "status": "implemented_or_pattern_source",
+      "implementation_strategy": "Use PA/TX as examples and extract reusable helpers, but do not rewrite working adapters unless needed.",
+      "shared_adapter_candidate": false,
+      "sources": [
+        {
+          "source_key": "pa_openbookpa_contracts",
+          "jurisdiction_code": "PA",
+          "jurisdiction_name": "Pennsylvania",
+          "source_name": "OpenBookPA Contracts e-Library",
+          "target_url": "https://www.patreasury.gov/openbookpa/e-library/",
+          "target_api": "Implemented JSON endpoints: /Home/SelParties/ and /Home/SearchContractData.",
+          "raw_platform": "OpenBookPA",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "contracts",
+            "awards",
+            "incumbents",
+            "expiring_contracts"
+          ],
+          "adapter_targets": [
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented MVP for Gainwell/DXC/HMS/HP Enterprise contract history."
+        },
+        {
+          "source_key": "tx_esbd",
+          "jurisdiction_code": "TX",
+          "jurisdiction_name": "Texas",
+          "source_name": "TXSmartBuy ESBD Solicitations",
+          "target_url": "https://www.txsmartbuy.gov/esbd",
+          "target_api": "Implemented JSON endpoint: /app/extensions/CPA/CPAMain/1.0.0/services/ESBD.Service.ss.",
+          "raw_platform": "TXSmartBuy ESBD",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented strict filter MVP; current dry run returned 0 final records."
+        },
+        {
+          "source_key": "tx_txsmartbuy_contracts",
+          "jurisdiction_code": "TX",
+          "jurisdiction_name": "Texas",
+          "source_name": "TXSmartBuy Statewide Contracts",
+          "target_url": "https://www.txsmartbuy.gov/browsecontracts",
+          "target_api": "Implemented JSON endpoints: BrowseContracts.Service.ss and BrowseContracts.Details.Service.ss.",
+          "raw_platform": "TXSmartBuy",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "contracts",
+            "awards",
+            "incumbents",
+            "expiring_contracts"
+          ],
+          "adapter_targets": [
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented strict filter MVP; 0 final records after filtering."
+        },
+        {
+          "source_key": "id_purchasing",
+          "jurisdiction_code": "ID",
+          "jurisdiction_name": "Idaho",
+          "source_name": "Idaho Division of Purchasing",
+          "target_url": "https://purchasing.idaho.gov/open-and-future-solicitations/",
+          "target_api": "Implemented official JSON endpoint: https://purchasing.idaho.gov/wp-json/wm4/v1/procurement-report populates the public open/future solicitations table.",
+          "raw_platform": "Idaho Division of Purchasing WordPress procurement report",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Reclassified from Jaggaer/SciQuest. Official page source exposes the /wp-json/wm4/v1/procurement-report DataTables route; LUMA/Infor supplier route returned 200 with 0 bytes from CLI. Implemented ID adapter; dry-run scanned 36 rows and returned 9 records."
+        }
+      ],
+      "reclassification_signals": [
+        "Already verified JSON; only reclassify if portal breaks or endpoint disappears."
+      ]
+    },
+    {
+      "platform_family": "bso_periscope_buyspeed",
+      "title": "BSO / Periscope / BuySpeed-style portals",
+      "status": "open",
+      "implementation_strategy": "Build one shared BSO probe/client, then specialize field mapping per state.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "il_bidbuy",
+          "jurisdiction_code": "IL",
+          "jurisdiction_name": "Illinois",
+          "source_name": "Illinois BidBuy",
+          "target_url": "https://www.bidbuy.illinois.gov/bso/",
+          "target_api": "BidBuy BSO public solicitations/contracts; probe BSO search params and export endpoints.",
+          "raw_platform": "Periscope/BidBuy BSO",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "High Medicaid/enterprise procurement priority."
+        },
+        {
+          "source_key": "ma_commbuys",
+          "jurisdiction_code": "MA",
+          "jurisdiction_name": "Massachusetts",
+          "source_name": "COMMBUYS",
+          "target_url": "https://www.commbuys.com/bso/",
+          "target_api": "COMMBUYS BSO public bids/contracts; probe search params and export endpoints.",
+          "raw_platform": "Periscope/BuySpeed BSO",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "High Medicaid and health IT priority."
+        },
+        {
+          "source_key": "nj_njstart",
+          "jurisdiction_code": "NJ",
+          "jurisdiction_name": "New Jersey",
+          "source_name": "NJSTART",
+          "target_url": "https://www.njstart.gov/bso/",
+          "target_api": "NJSTART BSO public solicitations/contracts; requires JSF/form-state handling.",
+          "raw_platform": "Periscope/BuySpeed BSO",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Known hard case: JSF state handling; bids likely easier than active contracts."
+        },
+        {
+          "source_key": "nv_nevadaepro",
+          "jurisdiction_code": "NV",
+          "jurisdiction_name": "Nevada",
+          "source_name": "NevadaEPro",
+          "target_url": "https://nevadaepro.com/",
+          "target_api": "NevadaEPro public solicitations/contracts; probe Periscope/Buyspeed endpoints.",
+          "raw_platform": "NevadaEPro",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Statewide portal should cover opportunities and contracts."
+        },
+        {
+          "source_key": "or_oregonbuys",
+          "jurisdiction_code": "OR",
+          "jurisdiction_name": "Oregon",
+          "source_name": "OregonBuys",
+          "target_url": "https://oregonbuys.gov/",
+          "target_api": "OregonBuys public solicitations/contracts; probe Periscope/Buyspeed endpoints.",
+          "raw_platform": "OregonBuys",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "High Medicaid modernization relevance."
+        },
+        {
+          "source_key": "vi_dpp_procurement",
+          "jurisdiction_code": "VI",
+          "jurisdiction_name": "U.S. Virgin Islands",
+          "source_name": "Virgin Islands Department of Property and Procurement",
+          "target_url": "https://gvibuy.buyspeed.com/bso/",
+          "target_api": "GVIBUY BuySpeed BSO public open-bids route /bso/view/search/external/advancedSearchBid.xhtml?openBids=true; implemented through shared BSO helper.",
+          "raw_platform": "GVIBUY BuySpeed BSO",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented VI opportunity adapter using shared BSO parser; dry-run scanned 25 public rows and returned 0 default-keyword records.",
+          "access_method": "vendor_platform_adapter",
+          "platform": "GVIBUY BuySpeed BSO",
+          "confidence": "high"
+        }
+      ],
+      "reclassification_signals": [
+        "No /bso/ routes, no JSF/BuySpeed-like forms, no shared search pages.",
+        "Portal is actually Jaggaer/SciQuest, PeopleSoft, or custom API behind a state-branded shell."
+      ]
+    },
+    {
+      "platform_family": "cgi_advantage_vss",
+      "title": "CGI Advantage Vendor Self Service",
+      "status": "open",
+      "implementation_strategy": "Build VSS session/form/query helper for public solicitations/contracts; reuse across states with URL/config differences.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "ak_iris_vss",
+          "jurisdiction_code": "AK",
+          "jurisdiction_name": "Alaska",
+          "source_name": "Alaska IRIS Vendor Self Service",
+          "target_url": "https://iris-vss.alaska.gov/PRDVSS1X1/Advantage4",
+          "target_api": "CGI Advantage/VSS public solicitation and award screens; probe form/XHR endpoints.",
+          "raw_platform": "CGI Advantage VSS",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Secondary target for richer procurement metadata."
+        },
+        {
+          "source_key": "co_vss",
+          "jurisdiction_code": "CO",
+          "jurisdiction_name": "Colorado",
+          "source_name": "Colorado Vendor Self Service",
+          "target_url": "https://prd.co.cgiadvantage.com/PRDVSS1X1/Advantage4",
+          "target_api": "Official OSC/SPCO Solicitations page links the ColoradoVSS replacement public CGI Advantage route. Prior catalog host https://codpa-vss.cloud.cgifederal.com/webapp/PRDVSS2X1/AltSelfService is DNS/NXDOMAIN from CLI. Replacement route returned 20 public published-solicitation rows through the existing VSS helper.",
+          "raw_platform": "ColoradoVSS / CGI Advantage VSS",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter using official replacement ColoradoVSS route linked from https://osc.colorado.gov/spco/solicitations. Contracts/awards remain separate/deferred."
+        },
+        {
+          "source_key": "ky_vss",
+          "jurisdiction_code": "KY",
+          "jurisdiction_name": "Kentucky",
+          "source_name": "Kentucky Vendor Self Service",
+          "target_url": "https://vss.ky.gov/vssprod-ext/Advantage4",
+          "target_api": "Official Kentucky VSS replacement host. Prior catalog target https://emars.ky.gov/online/vss/ resets CLI HTTP/TLS connections. Replacement route returned 20 public published-solicitation rows through the existing VSS helper.",
+          "raw_platform": "Kentucky VSS / CGI Advantage VSS",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter using official replacement vss.ky.gov route. Default-keyword dry probe returned no relevant records after filtering a category-code-only HMS false hit. Contracts/awards remain separate/deferred."
+        },
+        {
+          "source_key": "mi_sigma_vss",
+          "jurisdiction_code": "MI",
+          "jurisdiction_name": "Michigan",
+          "source_name": "Michigan SIGMA Vendor Self Service",
+          "target_url": "https://sigma.michigan.gov/PRDVSS1X1/Advantage4",
+          "target_api": "SIGMA VSS public solicitations/contracts; probe form/XHR endpoints.",
+          "raw_platform": "CGI Advantage VSS/SIGMA",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "High Medicaid/eligibility systems priority."
+        },
+        {
+          "source_key": "wv_oasis_vss",
+          "jurisdiction_code": "WV",
+          "jurisdiction_name": "West Virginia",
+          "source_name": "wvOASIS Vendor Self Service",
+          "target_url": "https://prd311.wvoasis.gov/PRDVSS1X1ERP/Advantage4",
+          "target_api": "wvOASIS/VSS public solicitations/contracts; probe supplier portal routes.",
+          "raw_platform": "wvOASIS VSS",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "VSS-style adapter likely reusable."
+        }
+      ],
+      "reclassification_signals": [
+        "No AltSelfService or CGI-style VSS route.",
+        "Search pages are inaccessible without login or route to another procurement platform."
+      ]
+    },
+    {
+      "platform_family": "peoplesoft_supplier",
+      "title": "PeopleSoft supplier portals",
+      "status": "open",
+      "implementation_strategy": "Build minimal PeopleSoft component-state probe before implementation; only implement if public event search is reachable without login.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "ca_caleprocure",
+          "jurisdiction_code": "CA",
+          "jurisdiction_name": "California",
+          "source_name": "Cal eProcure",
+          "target_url": "https://caleprocure.ca.gov/pages/LPASearch/lpa-search.aspx",
+          "target_api": "State contracts implemented against official Cal eProcure State Leveraged Procurement Agreements (LPA) InFlight/PeopleSoft search; public current rows expose contract id, description, contract type, acquisition type, supplier/vendor, supplier id, begin date, expire date, and buyer. Opportunities remain on the Events-BS3 event-search adapter.",
+          "raw_platform": "Cal eProcure InFlight / PeopleSoft LPA search",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates",
+            "grants"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Reclassified for state_contracts from Events-BS3 event rows to Cal eProcure homepage-linked LPASearch current contract route /pages/LPASearch/lpa-search.aspx backed by /nlx3/psc/psfpd1/SUPPLIER/ERP/c/ZZ_PO.ZZ_CNT_SRC_CMP_BKP.GBL."
+        },
+        {
+          "source_key": "ks_esupplier",
+          "jurisdiction_code": "KS",
+          "jurisdiction_name": "Kansas",
+          "source_name": "Kansas eSupplier Public Bid Solicitations",
+          "target_url": "https://admin.ks.gov/offices/procurement-contracts/bidding--contracts",
+          "target_api": "Implemented: official Kansas Department of Administration Bidding & Contracts page returned 200 and links the eSupplier public bid component. With normal cookie handling, the PeopleSoft component returned 33 current public rows with event id, title, agency, start date, and end date; no login, CAPTCHA, or browser automation used.",
+          "raw_platform": "Kansas eSupplier PeopleSoft login-gated",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter services/state_opportunities/ks.py. Additional Bid Opportunities page remains local/campus/construction links plus an RSS route with no statewide item rows.",
+          "access_method": "vendor_platform_adapter",
+          "platform": "Kansas eSupplier PeopleSoft public bid component",
+          "confidence": "high"
+        },
+        {
+          "source_key": "mn_swift_supplier",
+          "jurisdiction_code": "MN",
+          "jurisdiction_name": "Minnesota",
+          "source_name": "Minnesota SWIFT Supplier Portal",
+          "target_url": "https://mn.gov/admin/osp/vendors/solicitations-and-contract-opportunities/goods-and-services-solicitation-opportunities/index.jsp",
+          "target_api": "Blocked: supplier.swift.state.mn.us remains DNS/NXDOMAIN. Official mn.gov/admin/sitemap.xml returned 200 and lists solicitation/contract-opportunity pages, but goods/services, professional/technical, construction, lease, and quicklink solicitation pages redirect from CLI to validate.perfdrive.com Radware Bot Manager Captcha with ShieldSquare support token; no public rows exposed without CAPTCHA/browser flow.",
+          "raw_platform": "Minnesota OSP/SWIFT solicitation pages CAPTCHA-gated",
+          "raw_access_method": "manual_probe_required",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "No adapter registered. Official sitemap confirms target pages, but tested opportunity pages are Radware CAPTCHA gated and SWIFT host is DNS-dead.",
+          "access_method": "manual_probe_required",
+          "platform": "Minnesota OSP/SWIFT solicitation pages CAPTCHA-gated",
+          "confidence": "high"
+        }
+      ],
+      "reclassification_signals": [
+        "Portal requires login for all events/contracts.",
+        "State uses public static pages or a non-PeopleSoft event viewer for vendor-facing search."
+      ]
+    },
+    {
+      "platform_family": "jaggaer_sciquest",
+      "title": "Jaggaer / SciQuest-style public event routes",
+      "status": "open",
+      "implementation_strategy": "Use PublicEvent route only for true Jaggaer/SciQuest sources; reclassify Ivalua/browser-check portals instead of forcing the shared adapter.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "mt_emacs",
+          "jurisdiction_code": "MT",
+          "jurisdiction_name": "Montana",
+          "source_name": "Montana eMACS",
+          "target_url": "https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=StateOfMontana",
+          "target_api": "Jaggaer/SciQuest public event route; adapter can search current opportunities.",
+          "raw_platform": "Jaggaer/SciQuest eMACS",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Contract history may require separate state contracts page."
+        },
+        {
+          "source_key": "ia_das_procurement",
+          "jurisdiction_code": "IA",
+          "jurisdiction_name": "Iowa",
+          "source_name": "Iowa DAS Procurement",
+          "target_url": "https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=DASIowa",
+          "target_api": "DAS Bidding Opportunities links to the Jaggaer/SciQuest PublicEvent route; adapter parses current open events.",
+          "raw_platform": "Jaggaer/SciQuest IMPACS PublicEvent",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Confirmed from official DAS Bidding Opportunities page link to PublicEvent?CustomerOrg=DASIowa; awards/contracts stay separate."
+        }
+      ],
+      "reclassification_signals": [
+        "No PublicEvent route or Jaggaer/SciQuest assets after one focused probe.",
+        "Portal loads Ivalua page.aspx assets and redirects public browse routes to browser_check/reCAPTCHA.",
+        "State page links to a custom portal, BSO, Bonfire, or document-only page instead."
+      ]
+    },
+    {
+      "platform_family": "public_purchase",
+      "title": "Public Purchase publicInfo pages",
+      "status": "open",
+      "implementation_strategy": "Use publicInfo listing pages only when public rows are visible without login; treat bidView detail pages as login-gated unless a public detail endpoint is proven.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "wy_procurement",
+          "jurisdiction_code": "WY",
+          "jurisdiction_name": "Wyoming",
+          "source_name": "Wyoming Procurement and Public Purchase",
+          "target_url": "https://ai.wyo.gov/divisions/general-services/purchasing/bid-opportunities",
+          "target_api": "Official Wyoming bid page links to Public Purchase publicInfo listing https://www.publicpurchase.com/gems/wyominggsd,wy/buyer/public/publicInfo; bidView detail pages return login/401 from CLI.",
+          "raw_platform": "Public Purchase",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Catalog /for-vendors URL returned 404. Implemented opportunities adapter against Public Purchase publicInfo listing; detail pages are login-gated."
+        }
+      ],
+      "reclassification_signals": [
+        "Official state page links to www.publicpurchase.com/gems/.../buyer/public/publicInfo.",
+        "Bid detail route /bid/bidView is login-gated but publicInfo contains current public rows."
+      ]
+    },
+    {
+      "platform_family": "bonfire",
+      "title": "Bonfire public procurement portals",
+      "status": "open",
+      "implementation_strategy": "Build a future Bonfire portal adapter from official linked public solicitation portals.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "nm_state_purchasing",
+          "jurisdiction_code": "NM",
+          "jurisdiction_name": "New Mexico",
+          "source_name": "New Mexico State Purchasing Division",
+          "target_url": "https://nmgeneralservices.bonfirehub.com/portal/?tab=openOpportunities",
+          "target_api": "Bonfire public JSON endpoint /PublicPortal/getOpenPublicOpportunitiesSectionData; implemented through shared Bonfire helper.",
+          "raw_platform": "New Mexico GSD Bonfire public portal",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented NM opportunity adapter using shared Bonfire helper; dry-run scanned 1 public row and returned 0 default-keyword records. Official GSD page also contains Jaggaer/SciQuest signals, but Bonfire route is the reachable public open-opportunity source.",
+          "access_method": "official_portal_json",
+          "platform": "New Mexico GSD Bonfire public portal",
+          "confidence": "high"
+        },
+        {
+          "source_key": "ut_procurement_place",
+          "jurisdiction_code": "UT",
+          "jurisdiction_name": "Utah",
+          "source_name": "Utah Public Procurement Place",
+          "target_url": "https://utah.bonfirehub.com/portal/?tab=openOpportunities",
+          "target_api": "Bonfire public JSON endpoint /PublicPortal/getOpenPublicOpportunitiesSectionData; implemented through shared Bonfire helper.",
+          "raw_platform": "Bonfire public portal",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented UT opportunity adapter using shared Bonfire helper; dry-run scanned 208 public rows and returned 22 default-keyword records.",
+          "access_method": "official_portal_json",
+          "platform": "Bonfire public portal",
+          "confidence": "high"
+        }
+      ],
+      "reclassification_signals": [
+        "Official source links to a bonfirehub.com public portal.",
+        "Portal page loads Bonfire/gobonfire assets and open-opportunities UI."
+      ]
+    },
+    {
+      "platform_family": "html_form_search_table",
+      "title": "HTML form/search/table adapters",
+      "status": "open",
+      "implementation_strategy": "Build small reusable HTML parsing/form helpers; implement per source only when pages are stable and public.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "ak_online_public_notices",
+          "jurisdiction_code": "AK",
+          "jurisdiction_name": "Alaska",
+          "source_name": "Alaska Online Public Notices",
+          "target_url": "https://aws.state.ak.us/OnlinePublicNotices/",
+          "target_api": "Official notice search pages; use category/query adapter for procurement and agency notices.",
+          "raw_platform": "Alaska Online Public Notices",
+          "raw_access_method": "html_search_adapter",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates",
+            "medicaid_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_updates"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Good for notices; contract history may require IRIS/VSS or agency pages."
+        },
+        {
+          "source_key": "ga_procurement_registry",
+          "jurisdiction_code": "GA",
+          "jurisdiction_name": "Georgia",
+          "source_name": "Georgia Procurement Registry",
+          "target_url": "https://ssl.doas.state.ga.us/PRSapp/PR_index.jsp",
+          "target_api": "Georgia Procurement Registry search pages; form adapter for open events and awards.",
+          "raw_platform": "DOAS Procurement Registry",
+          "raw_access_method": "html_form_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "High-value Medicaid/MMIS market."
+        },
+        {
+          "source_key": "la_lapac",
+          "jurisdiction_code": "LA",
+          "jurisdiction_name": "Louisiana",
+          "source_name": "Louisiana LaPAC",
+          "target_url": "https://wwwcfprd.doa.louisiana.gov/osp/lapac/pubMain.cfm",
+          "target_api": "LaPAC public bid search CFM endpoints; form adapter for opportunities and addenda.",
+          "raw_platform": "LaPAC",
+          "raw_access_method": "html_form_adapter",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Pair with LaGov/vendor pages for contract history if needed."
+        },
+        {
+          "source_key": "me_procurement_rfps",
+          "jurisdiction_code": "ME",
+          "jurisdiction_name": "Maine",
+          "source_name": "Maine Procurement Services RFPs",
+          "target_url": "https://www.maine.gov/dafs/bbm/procurementservices/vendors/rfps",
+          "target_api": "Maine RFP/award listing pages; scrape tables/doc links and probe any JSON exports.",
+          "raw_platform": "Maine Procurement Services",
+          "raw_access_method": "html_table_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "HTML/document-heavy; cap source count for MVP."
+        },
+        {
+          "source_key": "ms_contract_bid_search",
+          "jurisdiction_code": "MS",
+          "jurisdiction_name": "Mississippi",
+          "source_name": "Mississippi DFA Contract and Bid Search",
+          "target_url": "https://www.ms.gov/dfa/contract_bid_search",
+          "target_api": "DFA public contract/bid search; probe query params and result downloads.",
+          "raw_platform": "MS DFA",
+          "raw_access_method": "html_search_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Good candidate for lightweight HTML/query adapter."
+        },
+        {
+          "source_key": "nh_bids_contracts",
+          "jurisdiction_code": "NH",
+          "jurisdiction_name": "New Hampshire",
+          "source_name": "New Hampshire Bids and Contracts",
+          "target_url": "https://apps.das.nh.gov/bidscontracts/bids.aspx",
+          "target_api": "Blocked: catalog apps.das.nh.gov bids page returns HTTP 403 Access Denied from CLI over HTTP/HTTPS. Replacement checks of www.das.nh.gov home, purchasing, and bids_contracts.asp also return 403 even with browser user-agent; das.nh.gov robots.txt disallows all and sitemap.xml returns 403. No official stable public route found.",
+          "raw_platform": "NH DAS 403 gated",
+          "raw_access_method": "html_form_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "No adapter registered. Official NH DAS procurement pages remain 403 from CLI; robots disallows all.",
+          "access_method": "html_form_adapter",
+          "platform": "NH DAS 403 gated",
+          "confidence": "medium"
+        },
+        {
+          "source_key": "ny_contract_reporter",
+          "jurisdiction_code": "NY",
+          "jurisdiction_name": "New York",
+          "source_name": "New York State Contract Reporter",
+          "target_url": "https://www.nyscr.ny.gov/",
+          "target_api": "NYSCR search pages for opportunities; probe query endpoints and RSS/export options.",
+          "raw_platform": "NYS Contract Reporter",
+          "raw_access_method": "html_search_adapter",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "medium",
+          "notes": "High priority for opportunities."
+        },
+        {
+          "source_key": "nd_omb_solicitations",
+          "jurisdiction_code": "ND",
+          "jurisdiction_name": "North Dakota",
+          "source_name": "North Dakota OMB State Procurement",
+          "target_url": "https://www.omb.nd.gov/doing-business-state/procurement/ndbuys",
+          "target_api": "Blocked: official OMB NDBuys page returned 200 and links internal/public NDBuys routes. OMB sitemap returned 200, but internal.ndbuys.nd.gov and public.ndbuys.nd.gov request_browse_public and contract_browse_public routes redirect to /page.aspx/en/bas/browser_check with Google reCAPTCHA Enterprise/ivCaptcha; no stable current-row route found.",
+          "raw_platform": "NDBuys browser-check gated",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "No adapter registered. Landing page is reachable, but all tested NDBuys public opportunity/contract routes are browser-check/reCAPTCHA gated.",
+          "access_method": "html_table_adapter",
+          "platform": "ND OMB / NDBuys browser-check gated",
+          "confidence": "medium"
+        },
+        {
+          "source_key": "ok_omes_solicitations",
+          "jurisdiction_code": "OK",
+          "jurisdiction_name": "Oklahoma",
+          "source_name": "Oklahoma OMES Solicitations",
+          "target_url": "https://oklahoma.gov/omes/divisions/central-purchasing.html",
+          "target_api": "Implemented official replacement: OMES Central Purchasing page links Oklahoma Supplier Portal public Open Solicitations PeopleSoft component https://financials.ok.gov/psc/SOKLFP1DS/SUPPLIER/ERP/c/SCP_PUBLIC_MENU_FL.SCP_PUB_BID_CMP_FL.GBL; normal cookie-setting redirect returns 12 current public rows with event id, title, agency, start date, and end date. Obsolete /omes/services/purchasing/solicitations.html returns 404.",
+          "raw_platform": "Oklahoma Supplier Portal PeopleSoft public open solicitations component",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Implemented opportunities adapter services/state_opportunities/ok.py from official OMES-linked Supplier Portal. Dry probe scanned 12 public open rows; source is opportunities-only, contract awards remain separate."
+        },
+        {
+          "source_key": "pa_emarketplace",
+          "jurisdiction_code": "PA",
+          "jurisdiction_name": "Pennsylvania",
+          "source_name": "PA eMarketplace",
+          "target_url": "https://www.emarketplace.state.pa.us/",
+          "target_api": "Implemented ASP.NET WebForms pages: Search.aspx, BidAward.aspx, EP_Search.aspx.",
+          "raw_platform": "PA eMarketplace",
+          "raw_access_method": "html_form_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented PA WebForms adapter; use as style example for ASP.NET/form-state work."
+        },
+        {
+          "source_key": "sc_scbo",
+          "jurisdiction_code": "SC",
+          "jurisdiction_name": "South Carolina",
+          "source_name": "South Carolina Business Opportunities",
+          "target_url": "https://scbo.sc.gov/",
+          "target_api": "SCBO public bid/award postings; scrape/search notices and linked documents.",
+          "raw_platform": "SCBO",
+          "raw_access_method": "html_search_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Good opportunity source; contract history may require separate procurement contracts pages."
+        },
+        {
+          "source_key": "sd_procurement_management",
+          "jurisdiction_code": "SD",
+          "jurisdiction_name": "South Dakota",
+          "source_name": "South Dakota Procurement Management",
+          "target_url": "https://boa.sd.gov/central-services/procurement-management/",
+          "target_api": "Procurement Management bid/contracts pages; probe public listings and document links.",
+          "raw_platform": "SD Bureau of Administration",
+          "raw_access_method": "html_table_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Likely HTML/document adapter."
+        },
+        {
+          "source_key": "vt_bid_system",
+          "jurisdiction_code": "VT",
+          "jurisdiction_name": "Vermont",
+          "source_name": "Vermont Business Registry and Bid System",
+          "target_url": "https://www.vermontbusinessregistry.com/BidSearch.aspx?type=5",
+          "target_api": "Implemented official replacement: Vermont Business Registry home page links BidSearch.aspx?type=5 for Open State Bids; /BidSystem/ returns 404. Listing returned 34 open state rows and public BidPreview.aspx detail pages with closing dates and bidAttachments links.",
+          "raw_platform": "Vermont Business Registry ASP.NET Open State Bids listing",
+          "raw_access_method": "html_form_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Implemented opportunities adapter services/state_opportunities/vt.py from official Open State Bids listing and public detail/attachment pages. Awards remain separate under type=10."
+        },
+        {
+          "source_key": "wa_webs",
+          "jurisdiction_code": "WA",
+          "jurisdiction_name": "Washington",
+          "source_name": "Washington Electronic Business Solution",
+          "target_url": "https://fortress.wa.gov/ga/webs/",
+          "target_api": "WEBS public bid notifications and awards/contracts; probe form/query endpoints.",
+          "raw_platform": "WEBS",
+          "raw_access_method": "html_form_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "High Medicaid and health IT priority."
+        },
+        {
+          "source_key": "gu_gsa_procurement",
+          "jurisdiction_code": "GU",
+          "jurisdiction_name": "Guam",
+          "source_name": "Guam General Services Agency Procurement",
+          "target_url": "https://gsa.doa.guam.gov/invitation-for-bid/",
+          "target_api": "Blocked: official Guam GSA IFB page and WP REST page returned 200. WP REST rendered content had 2026/2025/2024 year tabs and many document links; 2026 tab mixes bid packets, amendments, cancellations, stay-of-procurement notices, bid-status/award-style links, and document dates with no structured due/closing/open status fields to separate current open opportunities safely.",
+          "raw_platform": "Guam GSA WordPress IFB static links",
+          "raw_access_method": "manual_probe_required",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "medium",
+          "notes": "No adapter registered. Static IFB documents are official but do not expose safe current/open metadata without guessing from year tabs or document names.",
+          "access_method": "manual_probe_required",
+          "platform": "Guam GSA WordPress IFB static links",
+          "confidence": "medium"
+        },
+        {
+          "source_key": "ri_ocean_state_procures",
+          "jurisdiction_code": "RI",
+          "jurisdiction_name": "Rhode Island",
+          "source_name": "Ocean State Procures",
+          "target_url": "https://ridop.ri.gov/vendor-resources/all-solicitations",
+          "target_api": "RIDOP All Solicitations links to legacy RIVIP ASP.NET POST targets /bidding/Bidlisting.aspx and /bidding/ExternalBidListing.aspx for active rows.",
+          "raw_platform": "RIDOP/RIVIP ASP.NET solicitation listing",
+          "raw_access_method": "html_form_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter; state active route returned 0 rows and external active route returned 23 public rows."
+        },
+        {
+          "source_key": "ne_materiel_purchasing",
+          "jurisdiction_code": "NE",
+          "jurisdiction_name": "Nebraska",
+          "source_name": "Nebraska Materiel State Purchasing",
+          "target_url": "https://das.nebraska.gov/materiel/bid-opportunities.html",
+          "target_api": "Implemented public HTML table endpoint: https://das.nebraska.gov/materiel/bid-opportunities.html.",
+          "raw_platform": "Nebraska DAS Materiel static bid opportunities table",
+          "raw_access_method": "html_table_adapter",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Reclassified from BSO/BuySpeed. Official DAS Materiel page links the Bid Opportunities HTML table; nebraska.buyspeed.com BSO host returned DNS error: No address associated with hostname. Implemented NE adapter; dry-run scanned 27 rows and returned 5 records."
+        },
+        {
+          "source_key": "tn_edison_supplier",
+          "jurisdiction_code": "TN",
+          "jurisdiction_name": "Tennessee",
+          "source_name": "Tennessee CPO RFP/RFI/RFQ Opportunities",
+          "target_url": "https://www.tn.gov/generalservices/procurement/central-procurement-office--cpo-/supplier-information/request-for-proposals--rfp--opportunities1.html",
+          "target_api": "Official Tennessee Central Procurement Office public RFP opportunities HTML table. The page returned 76 opportunity rows with document links and event start/response due dates. Edison supplier portal redirects to Oracle IDCS login from CLI.",
+          "raw_platform": "Tennessee CPO public RFP opportunities HTML table",
+          "raw_access_method": "html_table_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Reclassified from PeopleSoft Edison to official tn.gov public opportunities page and implemented. Contracts/awards remain separate/deferred.",
+          "access_method": "html_table_adapter",
+          "platform": "Tennessee CPO public RFP opportunities HTML table",
+          "confidence": "high"
+        },
+        {
+          "source_key": "md_emma",
+          "jurisdiction_code": "MD",
+          "jurisdiction_name": "Maryland",
+          "source_name": "Maryland DGS Open Bids and Contract Awards",
+          "target_url": "https://dgs.maryland.gov/Pages/Procurement/BidsAwards.aspx",
+          "target_api": "Implemented official alternate: Maryland DGS public SharePoint page returned 198 parsed bid/award rows and 1 Status=Open row from table id DGSBidAward. eMMA public solicitation, contract, and registration routes still redirect to /page.aspx/en/bas/browser_check with Google reCAPTCHA Enterprise/ivCaptcha; DGS table is used as the non-CAPTCHA public route.",
+          "raw_platform": "eMMA / Ivalua browser-check gated",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter services/state_opportunities/md.py from the official DGS Open Bids and Contract Awards table. eMMA remains blocked for full portal coverage.",
+          "access_method": "html_table_adapter",
+          "platform": "Maryland DGS SharePoint public bid/award table; eMMA browser-check gated",
+          "confidence": "high"
+        }
+      ],
+      "reclassification_signals": [
+        "Page loads a JS app with JSON/XHR data rather than stable server-side tables.",
+        "Source redirects into a known platform family like BSO, VSS, PeopleSoft, or Jaggaer."
+      ]
+    },
+    {
+      "platform_family": "custom_state_portal",
+      "title": "Custom or state-branded public portals",
+      "status": "open",
+      "implementation_strategy": "Use source catalog and generic probe tooling first. If a shared vendor platform is detected, reclassify instead of writing a custom adapter.",
+      "shared_adapter_candidate": false,
+      "sources": [
+        {
+          "source_key": "al_alabama_buys",
+          "jurisdiction_code": "AL",
+          "jurisdiction_name": "Alabama",
+          "source_name": "Alabama Department of Finance RFP Public View",
+          "target_url": "https://rfp.alabama.gov/PublicView.aspx",
+          "target_api": "Official Comptroller RFP database Public Access. ASP.NET form POST with ctl00$MyContent$ddlStatus=1 and Search returns 13 Open rows across legacy and STAARS RFP tables. Alabama Buys public solicitation route still redirects to /page.aspx/en/bas/browser_check with Google reCAPTCHA Enterprise.",
+          "raw_platform": "Alabama RFP Public View fallback; Alabama Buys blocked",
+          "raw_access_method": "html_form_search_table",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter from official Finance/Comptroller fallback linked by procurement.alabama.gov and comptroller.alabama.gov/rfp-database/. Alabama Buys remains browser_check/reCAPTCHA blocked from CLI; contracts remain deferred."
+        },
+        {
+          "source_key": "az_app",
+          "jurisdiction_code": "AZ",
+          "jurisdiction_name": "Arizona",
+          "source_name": "Arizona Procurement Portal",
+          "target_url": "https://app.az.gov/page.aspx/en/rfp/request_browse_public",
+          "target_api": "Arizona Procurement Portal public RFP browse table at /page.aspx/en/rfp/request_browse_public; detail links redirect to browser_check/reCAPTCHA from CLI.",
+          "raw_platform": "Arizona Procurement Portal public table",
+          "raw_access_method": "html_table_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter from the public browse table first page; detail pages remain browser-check gated from CLI."
+        },
+        {
+          "source_key": "ar_vendor_services",
+          "jurisdiction_code": "AR",
+          "jurisdiction_name": "Arkansas",
+          "source_name": "Arkansas ARBuy Open Bids",
+          "target_url": "https://arbuy.arkansas.gov/bso/view/search/external/advancedSearchBid.xhtml?openBids=true",
+          "target_api": "Official ARBuy BSO public open-bids page linked from SAS Current Solicitations: /bso/view/search/external/advancedSearchBid.xhtml?openBids=true. First page returned 2 public open rows.",
+          "raw_platform": "ARBuy BSO",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Catalog Arkansas Vendor Services host is DNS-dead. Official SAS procurement/current solicitations pages link ARBuy BSO open-bids route; implemented opportunities adapter with shared BSO helper. Contracts/awards deferred."
+        },
+        {
+          "source_key": "de_mymarketplace",
+          "jurisdiction_code": "DE",
+          "jurisdiction_name": "Delaware",
+          "source_name": "MyMarketplace Delaware",
+          "target_url": "https://mymarketplace.delaware.gov/",
+          "target_api": "MyMarketplace jqGrid JSON POST /Bids/GetBids?status=Open plus /Bids/GetBidDocumentList?id=<id>&currentCount=0 document-list HTML.",
+          "raw_platform": "MyMarketplace Delaware jqGrid JSON",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter; open-bids endpoint returned 43 public rows and dry-run returned 2 keyword records."
+        },
+        {
+          "source_key": "dc_ocp_contracts",
+          "jurisdiction_code": "DC",
+          "jurisdiction_name": "District of Columbia",
+          "source_name": "DC OCP Open Solicitations",
+          "target_url": "https://contracts.ocp.dc.gov/",
+          "target_api": "Angular lazy chunk exposes /api/solicitations/search and /api/solicitations/details. POST JSON {FilterBy:[{name:Type,value:0},{name:Status,value:Open}],OrderBy:[]} returns 32 open rows; details endpoint accepts encoded solicitation id.",
+          "raw_platform": "DC OCP Transparency API",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates",
+            "open_data"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities adapter from first-party OCP Transparency Angular API. Contracts/open-data split remains separate."
+        },
+        {
+          "source_key": "fl_myfloridamarketplace",
+          "jurisdiction_code": "FL",
+          "jurisdiction_name": "Florida",
+          "source_name": "MyFloridaMarketPlace Vendor Information Portal",
+          "target_url": "https://vendor.myfloridamarketplace.com/",
+          "target_api": "MFMP VIP public search/download pages for bids and state term contracts.",
+          "raw_platform": "MyFloridaMarketPlace",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "High-value Medicaid and managed care market."
+        },
+        {
+          "source_key": "hi_hands",
+          "jurisdiction_code": "HI",
+          "jurisdiction_name": "Hawaii",
+          "source_name": "Hawaii Awards and Notices Data System",
+          "target_url": "https://hands.ehawaii.gov/hands/",
+          "target_api": "HANDS public award/notice search; probe query endpoints used by the web app.",
+          "raw_platform": "HANDS",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "One portal covers opportunities and award notices."
+        },
+        {
+          "source_key": "in_idoa_procurement",
+          "jurisdiction_code": "IN",
+          "jurisdiction_name": "Indiana",
+          "source_name": "Indiana IDOA Procurement",
+          "target_url": "https://www.in.gov/idoa/procurement/",
+          "target_api": "Implemented public HTML table endpoint: https://www.in.gov/idoa/procurement/current-business-opportunities/ with bid document ZIP links under /idoa/proc/solicitations/files/.",
+          "raw_platform": "Indiana IDOA Current Business Opportunities HTML/DataTables",
+          "raw_access_method": "html_table_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities MVP; current table scanned 56 public rows and returned 5 keyword records."
+        },
+        {
+          "source_key": "oh_ohiobuys",
+          "jurisdiction_code": "OH",
+          "jurisdiction_name": "Ohio",
+          "source_name": "OhioBuys",
+          "target_url": "https://ohiobuys.ohio.gov/",
+          "target_api": "Blocked: OhioBuys landing page returned 200 final login page with public browse links; public solicitation, contract, item, and supplier routes return final /page.aspx/en/bas/browser_check with Google reCAPTCHA Enterprise/ivCaptcha and captcha_script. robots.txt disallows all; sitemap.xml and official procure.ohio.gov/das.ohio.gov/supplier.ohio.gov candidate routes returned 404; no official alternate public listing/feed/API found.",
+          "raw_platform": "OhioBuys / Ivalua browser-check gated",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "No adapter registered. OhioBuys remains blocked by browser_check/reCAPTCHA and official alternate-route checks did not find a public current/open feed.",
+          "access_method": "public_portal_adapter",
+          "platform": "OhioBuys / Ivalua browser-check gated",
+          "confidence": "high"
+        },
+        {
+          "source_key": "mo_missouribuys",
+          "jurisdiction_code": "MO",
+          "jurisdiction_name": "Missouri",
+          "source_name": "MissouriBUYS",
+          "target_url": "https://missouribuys.mo.gov/",
+          "target_api": "Implemented Oracle Fusion Cloud public REST endpoint: /fscmRestApi/resources/latest/supplierNegotiationAbstracts?finder=RowFinderByBU;ProcurementBUId=300000005255687&q=NegotiationStatusCode=\"ACTIVE\" via MissouriBUYS MOVERS abstract listing.",
+          "raw_platform": "MissouriBUYS MOVERS / Oracle Fusion Cloud public REST",
+          "raw_access_method": "official_portal_json",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented opportunities MVP; active abstract REST scan returned 58 public rows and 2 keyword records."
+        },
+        {
+          "source_key": "ny_openbook_contracts",
+          "jurisdiction_code": "NY",
+          "jurisdiction_name": "New York",
+          "source_name": "Open Book New York",
+          "target_url": "https://www.openbooknewyork.com/",
+          "target_api": "Open Book NY contract spending/search; probe downloads or public query endpoints.",
+          "raw_platform": "Open Book NY",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "contracts",
+            "awards",
+            "incumbents",
+            "expiring_contracts",
+            "open_data"
+          ],
+          "adapter_targets": [
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Use for awarded contracts/incumbents."
+        },
+        {
+          "source_key": "nc_evp",
+          "jurisdiction_code": "NC",
+          "jurisdiction_name": "North Carolina",
+          "source_name": "North Carolina electronic Vendor Portal",
+          "target_url": "https://evp.nc.gov/",
+          "target_api": "NC eVP public solicitations/vendors/contracts; probe API/XHR endpoints.",
+          "raw_platform": "NC eVP",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "High Medicaid/NC FAST and managed care priority."
+        },
+        {
+          "source_key": "pr_asg_procurement",
+          "jurisdiction_code": "PR",
+          "jurisdiction_name": "Puerto Rico",
+          "source_name": "Puerto Rico General Services Administration",
+          "target_url": "https://www.asg.pr.gov/",
+          "target_api": "State contracts implemented against official ASG public contracts catalog https://www.asg.pr.gov/contratos; index exposes 51 category links and category pages expose contract document cards with contract number, supplier/vendor text in card header/description/file metadata, start date (Vigencia), end date (Expira), description, and document URL. Existing RUS SharePoint listing remains opportunities-only.",
+          "raw_platform": "ASG public contracts catalog; RUS SharePoint opportunities",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Implemented state_contracts adapter services/state_contracts/pr.py for ASG Contratos. Dry-run with Gainwell Technologies scanned 512 contract document cards and returned 0 Gainwell/default-keyword records; source is valid for awarded/current vendor contract metadata. RUS open subastas are not stored as contracts.",
+          "confidence": "high",
+          "access_method": "public_portal_adapter",
+          "platform": "ASG public contracts catalog; RUS SharePoint opportunities"
+        },
+        {
+          "source_key": "tx_dir",
+          "jurisdiction_code": "TX",
+          "jurisdiction_name": "Texas",
+          "source_name": "Texas DIR Cooperative Contracts",
+          "target_url": "https://dir.texas.gov/contracts",
+          "target_api": "DIR contract search; add disk cache and slow throttle before live adapter due prior 429.",
+          "raw_platform": "Texas DIR",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "contracts",
+            "awards",
+            "incumbents",
+            "expiring_contracts"
+          ],
+          "adapter_targets": [
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "Prior finding: useful but needs disk cache and slow throttle due 429."
+        },
+        {
+          "source_key": "va_eva",
+          "jurisdiction_code": "VA",
+          "jurisdiction_name": "Virginia",
+          "source_name": "eVA Virginia Procurement Portal",
+          "target_url": "https://eva.virginia.gov/",
+          "target_api": "Blocked for state_contracts in CLI: official eVA/Ivalua contract browse https://procure.cgieva.com/page.aspx/en/ctr/contract_browse_public and supplier mirror redirect to /page.aspx/en/bas/browser_check with Google reCAPTCHA/ivCaptcha; mvendor PublicSearch/solr routes return AWS WAF challenge from CLI; Logi public reports checked (9001 vendor list, 9004 NIGP codes, 9015 vendor catalogs, 9023 SWAM contractor pool) do not expose contract id + awarded vendor + agency + end date. Opportunities adapter remains separate eVA VBO Solr and must not be used as contracts.",
+          "raw_platform": "eVA / Ivalua contract browse browser-check gated; Logi alternates insufficient",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "No state_contracts adapter registered. Official current-contract browse is browser-check/reCAPTCHA gated; mvendor public search/Solr is AWS WAF challenged from CLI; alternate Logi/DGS pages lacked required contract-domain fields.",
+          "confidence": "high",
+          "access_method": "public_portal_adapter",
+          "platform": "eVA / Ivalua contract browse browser-check gated; Logi alternates insufficient"
+        },
+        {
+          "source_key": "wi_vendornet",
+          "jurisdiction_code": "WI",
+          "jurisdiction_name": "Wisconsin",
+          "source_name": "Wisconsin VendorNet",
+          "target_url": "https://vendornet.wi.gov/",
+          "target_api": "VendorNet public bids/contracts; probe search params and downloadable result feeds.",
+          "raw_platform": "VendorNet",
+          "raw_access_method": "public_portal_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "medium",
+          "notes": "High Medicaid/eligibility and health IT priority."
+        }
+      ],
+      "reclassification_signals": [
+        "Browser/network probe reveals BSO, VSS, PeopleSoft, Jaggaer/SciQuest, Bonfire, Socrata/OpenData, or Ivalua/browser-check gating.",
+        "Only PDFs/static pages exist; move to html_form_search_table or manual_probe_required."
+      ]
+    },
+    {
+      "platform_family": "proactis_webprocure",
+      "title": "Proactis WebProcure public white-label portals",
+      "status": "blocked",
+      "implementation_strategy": "Do not implement until Proactis/WebProcure public assets or API routes are reachable with standard TLS and return safe current solicitation metadata.",
+      "shared_adapter_candidate": true,
+      "sources": [
+        {
+          "source_key": "ct_ctsource",
+          "jurisdiction_code": "CT",
+          "jurisdiction_name": "Connecticut",
+          "source_name": "CTsource",
+          "target_url": "https://portal.ct.gov/das/ctsource/bidboard",
+          "target_api": "Blocked Proactis/WebProcure route: CTsource embeds https://webprocure.proactiscloud.com/wp-web-public with _wpcall=bidboard and _customerid=51; no official CTsource alternate API/feed/doc route found; vendor base/assets fail standard TLS and curl -k times out with 0 bytes. Legacy BizNet fallback checked: https://biznet.ct.gov/SCP_Search/Default.aspx redirects to CTsource landing; BidResults.aspx and BidDetail.aspx return 200 but no search-session criteria, direct/common query params return 0/No Solicitations Found, and no stable public listing API or searchable route was found.",
+          "raw_platform": "Proactis WebProcure blocked",
+          "raw_access_method": "vendor_platform_adapter",
+          "information_tags": [
+            "opportunities",
+            "awards",
+            "contracts",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_contracts"
+          ],
+          "classification_confidence": "high",
+          "notes": "Official CTsource Bid Board/resources/login pages return 200 but only expose UI/embed routes. Linked CTsource PDFs describe UI search and supplier workflows only. WhiteLabel.js and FrameManager.js are not reachable from CLI with standard TLS; insecure probes timed out with 0 bytes. No adapter registered. Legacy BizNet fallback checked: https://biznet.ct.gov/SCP_Search/Default.aspx redirects to CTsource landing; BidResults.aspx and BidDetail.aspx return 200 but no search-session criteria, direct/common query params return 0/No Solicitations Found, and no stable public listing API or searchable route was found."
+        }
+      ],
+      "reclassification_signals": [
+        "Official page injects webprocure.proactiscloud.com/wp-web-public assets.",
+        "Inline _wprocure config includes _wpcall=bidboard or contractboard and a customer id."
+      ]
+    },
+    {
+      "platform_family": "state_health_rht_pages",
+      "title": "State health/RHT pages outside procurement portals",
+      "status": "open",
+      "implementation_strategy": "Use conservative HTML page parsers for dated RHT, Medicaid, rural hospital, grants, and funding windows. Keep separate from procurement adapters unless records are actual bids/grants.",
+      "shared_adapter_candidate": false,
+      "sources": [
+        {
+          "source_key": "pa_dhs_rhtp",
+          "jurisdiction_code": "PA",
+          "jurisdiction_name": "Pennsylvania",
+          "source_name": "PA DHS RHTP Funding Opportunities",
+          "target_url": "https://www.pa.gov/agencies/dhs/programs-services/healthcare/rural-health/rhtp-funding-opportunities",
+          "target_api": "Implemented conservative HTML parser for dated RHTP funding windows.",
+          "raw_platform": "PA DHS",
+          "raw_access_method": "html_page_adapter",
+          "information_tags": [
+            "medicaid_updates",
+            "rht_updates",
+            "grants",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities",
+            "state_updates"
+          ],
+          "classification_confidence": "high",
+          "notes": "Strong RHT signal source."
+        }
+      ],
+      "reclassification_signals": [
+        "Page is a procurement portal notice; move to opportunities group.",
+        "Page has no dated records or stable content; mark blocked/manual."
+      ]
+    },
+    {
+      "platform_family": "territory_manual_probe",
+      "title": "Territories requiring manual source discovery",
+      "status": "open",
+      "implementation_strategy": "Do a short official-site probe, identify any public bid/contract listing, then reclassify to a concrete group before adapter work.",
+      "shared_adapter_candidate": false,
+      "sources": [
+        {
+          "source_key": "as_asg_procurement",
+          "jurisdiction_code": "AS",
+          "jurisdiction_name": "American Samoa",
+          "source_name": "American Samoa Government Procurement",
+          "target_url": "https://www.americansamoa.gov/",
+          "target_api": "Blocked: official ASG Wix homepage returned 200; robots.txt, sitemap.xml, and pages-sitemap.xml returned 200, and /notices returned 200 but only showed procurement administrative-rule notice text, not bid/RFP rows. Sitemap and same-domain link probes found no procurement/bid/RFP/vendor listing URLs or stable public opportunity rows.",
+          "raw_platform": "ASG Wix website",
+          "raw_access_method": "manual_probe_required",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "low",
+          "notes": "No adapter registered. Reprobe found no official stable public current/open procurement listing; /notices has procurement rulemaking notice text only.",
+          "access_method": "manual_probe_required",
+          "platform": "ASG Wix website; no public opportunity listing found",
+          "confidence": "low"
+        },
+        {
+          "source_key": "mp_finance_procurement",
+          "jurisdiction_code": "MP",
+          "jurisdiction_name": "Northern Mariana Islands",
+          "source_name": "CNMI Department of Finance Procurement",
+          "target_url": "https://www.finance.gov.mp/procurement-services.php",
+          "target_api": "Blocked: CNMI Finance Procurement Services page returned 200 and links Tyler VSS plus rfp.dof.gov.mp. VSS vendor/default, VBids, and Advantage routes redirect to /vss/common/Upgrade.aspx; VSS login redirects to Tyler Portico sign-in; rfp.dof.gov.mp timed out from CLI. No stable public current opportunity listing found.",
+          "raw_platform": "CNMI Finance Procurement / Tyler VSS / RFP host timeout",
+          "raw_access_method": "manual_probe_required",
+          "information_tags": [
+            "opportunities",
+            "procurement_updates"
+          ],
+          "adapter_targets": [
+            "state_opportunities"
+          ],
+          "classification_confidence": "low",
+          "notes": "No adapter registered. Official Finance links are login-gated, browser-upgrade gated, or unreachable from CLI.",
+          "access_method": "manual_probe_required",
+          "platform": "CNMI Finance Procurement / Tyler VSS / RFP host timeout",
+          "confidence": "low"
+        }
+      ],
+      "reclassification_signals": [
+        "Any public portal, platform vendor, RSS/feed, open-data catalog, or stable HTML table is found.",
+        "No public source found after focused official-site probe; mark blocked with evidence."
+      ]
+    }
+  ]
+}

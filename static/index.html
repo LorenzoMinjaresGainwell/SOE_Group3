@@ -4,19 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Rural Health Opportunity Dashboard</title>
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css?v=20260723-2">
   </head>
   <body>
     <header class="topbar">
       <div>
-        <p class="eyebrow">Local CSV proof of concept</p>
         <h1>Rural Health Opportunity Dashboard</h1>
       </div>
-      <button id="refreshButton" type="button">Refresh sources</button>
+      <a class="button-link" href="/?view=records">Federal Records</a>
     </header>
 
     <main>
       <section class="metrics" id="metrics"></section>
+
+      <nav class="category-tabs" id="categoryTabs" aria-label="Opportunity source categories"></nav>
 
       <section class="toolbar" aria-label="Opportunity filters">
         <label>
@@ -50,6 +51,7 @@
               <thead>
                 <tr>
                   <th>Opportunity</th>
+                  <th>Category / Data check</th>
                   <th>State</th>
                   <th>Due</th>
                   <th>Fit</th>
@@ -66,23 +68,18 @@
         </aside>
       </section>
 
-      <section class="lower-grid">
-        <section class="panel">
-          <div class="panel-heading">
-            <h2>Monitored sources</h2>
-          </div>
-          <div id="sourcesList" class="stack-list"></div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading">
-            <h2>Scoring model</h2>
-          </div>
-          <div id="rulesList" class="stack-list"></div>
-        </section>
-      </section>
+      <footer class="data-footer">
+        <details>
+          <summary>Monitored sources <span id="sourceCount"></span></summary>
+          <div id="sourcesList" class="footer-list"></div>
+        </details>
+        <details>
+          <summary>Scoring model <span id="ruleCount"></span></summary>
+          <div id="rulesList" class="footer-list"></div>
+        </details>
+      </footer>
     </main>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=20260723-2"></script>
   </body>
 </html>
