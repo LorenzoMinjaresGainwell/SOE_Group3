@@ -5,8 +5,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
+from services.auto_refresh import AutoRefresh, apply_changes
 from services.csv_store import CsvStore
-from services.gov_api_client import refresh_opportunities
 from services.neural_model import analyze_opportunity
 from services.scoring import explain_fit_score
 
@@ -14,6 +14,7 @@ from services.scoring import explain_fit_score
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
 store = CsvStore(ROOT / "data")
+auto_refresh = AutoRefresh(ROOT / "data")
 
 
 class AppHandler(SimpleHTTPRequestHandler):
@@ -34,9 +35,11 @@ class AppHandler(SimpleHTTPRequestHandler):
         if path == "/static/federal-records.js":
             return self._send_file(STATIC_DIR / "federal-records.js", "application/javascript")
         if path == "/api/opportunities":
-            return self._send_json(store.list_opportunities())
+            return self._send_json(apply_changes(store.list_opportunities(), auto_refresh.changes()))
         if path == "/api/federal-records":
-            return self._send_json(store.list_federal_records())
+            return self._send_json(apply_changes(store.list_federal_records(), auto_refresh.changes()))
+        if path == "/api/refresh/status":
+            return self._send_json(auto_refresh.status())
         if path.startswith("/api/federal-records/"):
             record_id = path.rsplit("/", 1)[-1]
             record = store.get_federal_record(record_id)
@@ -51,6 +54,7 @@ class AppHandler(SimpleHTTPRequestHandler):
             rules = store.list_scoring_rules()
             opportunity["fit_breakdown"] = explain_fit_score(opportunity, rules)
             opportunity["analysis"] = analyze_opportunity(opportunity)
+            apply_changes([opportunity], auto_refresh.changes())
             return self._send_json(opportunity)
         if path == "/api/sources":
             return self._send_json(store.list_sources())
@@ -77,7 +81,8 @@ class AppHandler(SimpleHTTPRequestHandler):
             return self._send_json(opportunity)
 
         if path == "/api/refresh":
-            return self._send_json(refresh_opportunities())
+            payload = self._read_json()
+            return self._send_json(auto_refresh.start(force=bool(payload.get("force"))), 202)
 
         return self._send_json({"error": "Not found"}, 404)
 

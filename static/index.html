@@ -10,8 +10,12 @@
     <header class="topbar">
       <div>
         <h1>Rural Health Opportunity Dashboard</h1>
+        <p class="refresh-status" id="refreshStatus">Checking data freshness…</p>
       </div>
-      <a class="button-link" href="/?view=records">Federal Records</a>
+      <div class="header-actions">
+        <button type="button" id="refreshButton">Refresh now</button>
+        <a class="button-link" href="/?view=records">Federal Records</a>
+      </div>
     </header>
 
     <main>
@@ -51,7 +55,7 @@
               <thead>
                 <tr>
                   <th>Opportunity</th>
-                  <th>Category</th>
+                  <th>Category / Data check</th>
                   <th>State</th>
                   <th>Due</th>
                   <th>Fit</th>

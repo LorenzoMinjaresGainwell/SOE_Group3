@@ -25,6 +25,8 @@ const els = {
   sources: document.querySelector("#sourcesList"),
   rules: document.querySelector("#rulesList"),
   tabs: document.querySelector("#categoryTabs"),
+  refreshStatus: document.querySelector("#refreshStatus"),
+  refreshButton: document.querySelector("#refreshButton"),
 };
 
 async function api(path, options = {}) {
@@ -70,6 +72,10 @@ function statusClass(status) {
   if (status === "Pursue") return "status-pursue";
   if (status === "Decline") return "status-decline";
   return "status";
+}
+
+function refreshClass(label) {
+  return `refresh-${String(label || "").toLowerCase().replace(/\s+/g, "-")}`;
 }
 
 function matchesToolbarFilters(opportunity) {
@@ -139,7 +145,12 @@ function renderTable() {
           <span>${escapeHtml(opportunity.agency)} | ${escapeHtml(opportunity.source)}</span>
         </div>
       </td>
-      <td><span class="badge category-badge">${escapeHtml(opportunity.category_label)}</span></td>
+      <td>
+        <span class="badge category-badge">${escapeHtml(opportunity.category_label)}</span>
+        ${opportunity.refresh_label && opportunity.refresh_label !== "Current"
+          ? `<span class="badge refresh-badge ${refreshClass(opportunity.refresh_label)}">${escapeHtml(opportunity.refresh_label)}</span>`
+          : ""}
+      </td>
       <td>${escapeHtml(opportunity.state)}</td>
       <td>${formatDate(opportunity.due_date)}</td>
       <td><span class="badge ${scoreClass(opportunity.fit_score)}">${opportunity.fit_score}</span></td>
@@ -175,6 +186,7 @@ function renderDetail(opportunity) {
   els.detail.innerHTML = `
     <div class="detail-header">
       <span class="badge ${scoreClass(opportunity.fit_score)}">${opportunity.fit_score} fit</span>
+      ${opportunity.refresh_label ? `<span class="badge refresh-badge ${refreshClass(opportunity.refresh_label)}">${escapeHtml(opportunity.refresh_label)}</span>` : ""}
       <h2>${escapeHtml(opportunity.title)}</h2>
       <div class="detail-meta">
         <span>${escapeHtml(opportunity.document_type)}</span>
@@ -197,6 +209,7 @@ function renderDetail(opportunity) {
       <div class="field"><span>Eligibility</span>${escapeHtml(opportunity.eligibility)}</div>
       <div class="field"><span>Recommendation</span>${escapeHtml(opportunity.ai_recommendation)}</div>
       <div class="field"><span>Source category</span>${escapeHtml(opportunity.category_label)}</div>
+      <div class="field"><span>API comparison</span>${escapeHtml(opportunity.refresh_label || "Not checked yet")}${opportunity.refresh_changed_fields?.length ? `<br><small>Changed: ${escapeHtml(opportunity.refresh_changed_fields.join(", "))}</small>` : ""}</div>
       <div class="field"><span>Official record</span>${opportunity.document_url ? `<a href="${escapeHtml(opportunity.document_url)}" target="_blank" rel="noopener">Open source</a>` : "Not available"}</div>
     </div>
 
@@ -293,6 +306,7 @@ async function renderSourcesAndRules() {
 }
 
 async function init() {
+  await startAutoRefresh(false);
   state.opportunities = await api("/api/opportunities");
   state.selectedId = state.opportunities[0]?.id || null;
   renderCategoryTabs();
@@ -300,6 +314,44 @@ async function init() {
   renderTable();
   await renderSourcesAndRules();
   if (state.selectedId) await selectOpportunity(state.selectedId);
+}
+
+async function startAutoRefresh(force) {
+  const status = await api("/api/refresh", {
+    method: "POST",
+    body: JSON.stringify({ force }),
+  });
+  renderRefreshStatus(status);
+  if (status.running || status.started) pollRefresh();
+}
+
+function renderRefreshStatus(status) {
+  els.refreshButton.disabled = Boolean(status.running);
+  els.refreshButton.textContent = status.running ? "Refreshing…" : "Refresh now";
+  const when = status.finished_at ? ` Last completed ${formatDateTime(status.finished_at)}.` : "";
+  els.refreshStatus.textContent = `${status.message || "Data refresh is ready."}${when} SAM.gov uses cached data and is not called automatically.`;
+}
+
+function pollRefresh() {
+  const timer = setInterval(async () => {
+    try {
+      const status = await api("/api/refresh/status");
+      renderRefreshStatus(status);
+      if (!status.running) {
+        clearInterval(timer);
+        state.opportunities = await api("/api/opportunities");
+        renderCategoryTabs();
+        renderMetrics();
+        renderTable();
+        await renderSourcesAndRules();
+        if (state.selectedId) await selectOpportunity(state.selectedId);
+      }
+    } catch (error) {
+      clearInterval(timer);
+      els.refreshStatus.textContent = error.message;
+      els.refreshButton.disabled = false;
+    }
+  }, 3000);
 }
 
 els.rows.addEventListener("click", (event) => {
@@ -331,6 +383,9 @@ function renderFilteredView() {
 els.search.addEventListener("input", renderFilteredView);
 els.score.addEventListener("input", renderFilteredView);
 els.status.addEventListener("change", renderFilteredView);
+els.refreshButton.addEventListener("click", () => startAutoRefresh(true).catch((error) => {
+  els.refreshStatus.textContent = error.message;
+}));
 
 init().catch((error) => {
   document.body.innerHTML = `<main><section class="panel"><h1>Unable to load dashboard</h1><p>${escapeHtml(error.message)}</p></section></main>`;
