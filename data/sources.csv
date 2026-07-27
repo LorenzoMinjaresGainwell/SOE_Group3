@@ -1,18 +1,10 @@
-<<<<<<< Updated upstream
 id,state,name,type,url,last_checked_at,status,opportunities_found
 src-001,Texas,Texas Procurement Portal,Procurement portal,https://example.com/texas-procurement,2026-07-02T10:30:00Z,Healthy,8
 src-002,Montana,Montana Office of Rural Health,Rural health office,https://example.com/montana-rural-health,2026-07-02T09:10:00Z,Healthy,3
 src-003,North Carolina,NC Medicaid Procurement,Medicaid site,https://example.com/nc-medicaid-procurement,2026-07-02T08:00:00Z,Needs review,4
 api-sam-opportunities,Federal,SAM.gov Opportunities API,Federal procurement API,https://api.sam.gov/opportunities/v2/search,2026-07-26T14:18:24Z,Healthy,21
-=======
-id,state,name,type,url,last_checked_at,status,opportunities_found
-src-001,Texas,Texas Procurement Portal,Procurement portal,https://example.com/texas-procurement,2026-07-02T10:30:00Z,Healthy,8
-src-002,Montana,Montana Office of Rural Health,Rural health office,https://example.com/montana-rural-health,2026-07-02T09:10:00Z,Healthy,3
-src-003,North Carolina,NC Medicaid Procurement,Medicaid site,https://example.com/nc-medicaid-procurement,2026-07-02T08:00:00Z,Needs review,4
-api-sam-opportunities,Federal,SAM.gov Opportunities API,Federal procurement API,https://api.sam.gov/opportunities/v2/search,2026-07-23T22:01:29Z,Healthy,0
 api-grants-gov,Federal,Grants.gov Search API,Federal grants API,https://api.grants.gov/v1/api/search2,2026-07-23T22:01:37Z,Needs review,0
 api-federal-register,Federal,Federal Register API,Federal policy API,https://www.federalregister.gov/api/v1/documents.json,2026-07-23T22:01:38Z,Healthy,25
 api-data-medicaid,Federal,data.medicaid.gov Catalog API,Medicaid data catalog API,https://data.medicaid.gov/api/1/metastore/schemas/dataset/items,2026-07-23T22:01:38Z,Healthy,25
 api-cms-provider-data,Federal,CMS Provider Data Catalog API,CMS data catalog API,https://data.cms.gov/provider-data/api/1/metastore/schemas/dataset/items,2026-07-23T22:01:39Z,Healthy,21
 api-usaspending-awards,Federal,USAspending.gov Awards API,Federal award history API,https://api.usaspending.gov/api/v2/search/spending_by_award/,2026-07-23T22:01:44Z,Healthy,25
->>>>>>> Stashed changes
