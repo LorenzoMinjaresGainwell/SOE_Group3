@@ -13,6 +13,7 @@ from services.scoring import explain_fit_score
 
 ROOT = Path(__file__).resolve().parent
 STATIC_DIR = ROOT / "static"
+DOCS_DIR = ROOT / "docs"
 store = CsvStore(ROOT / "data")
 auto_refresh = AutoRefresh(ROOT / "data")
 
@@ -34,6 +35,8 @@ class AppHandler(SimpleHTTPRequestHandler):
             return self._send_file(STATIC_DIR / "app.js", "application/javascript")
         if path == "/static/federal-records.js":
             return self._send_file(STATIC_DIR / "federal-records.js", "application/javascript")
+        if path == "/static/gainwell-logo.png":
+            return self._send_file(DOCS_DIR / "gainwell-logo.png", "image/png")
         if path == "/api/opportunities":
             return self._send_json(apply_changes(store.list_opportunities(), auto_refresh.changes()))
         if path == "/api/federal-records":
@@ -73,6 +76,19 @@ class AppHandler(SimpleHTTPRequestHandler):
             if status not in {"Pursue", "Monitor", "Decline", "Unreviewed"}:
                 return self._send_json({"error": "Invalid status"}, 400)
             opportunity = store.update_status(opportunity_id, status, payload.get("note", ""))
+            if not opportunity:
+                return self._send_json({"error": "Opportunity not found"}, 404)
+            rules = store.list_scoring_rules()
+            opportunity["fit_breakdown"] = explain_fit_score(opportunity, rules)
+            opportunity["analysis"] = analyze_opportunity(opportunity)
+            return self._send_json(opportunity)
+
+        if path.startswith("/api/opportunities/") and path.endswith("/pin"):
+            opportunity_id = path.split("/")[-2]
+            payload = self._read_json()
+            if not isinstance(payload.get("pinned"), bool):
+                return self._send_json({"error": "Pinned must be true or false"}, 400)
+            opportunity = store.update_pinned(opportunity_id, payload["pinned"])
             if not opportunity:
                 return self._send_json({"error": "Opportunity not found"}, 404)
             rules = store.list_scoring_rules()
