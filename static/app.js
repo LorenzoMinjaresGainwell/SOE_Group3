@@ -530,7 +530,7 @@ function renderOpportunityDetail(item) {
   const history = Array.isArray(item.status_history) ? item.status_history : [];
   els.detail.innerHTML = `${detailHeader(item, "opportunities", `<span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status || "Unreviewed")}</span>`)}
     ${prioritySummary(item, "opportunities")}
-    <div class="action-row" aria-label="Opportunity actions">
+    <div class="action-row" role="group" aria-label="Opportunity actions">
       <button type="button" class="secondary-button ${item.pinned ? "is-pinned" : ""}" data-pinned="${!item.pinned}">${item.pinned ? "Unpin" : "Pin"}</button>
       ${["Pursue", "Monitor", "Decline"].map((status) => `<button type="button" data-status="${status}" ${item.status === status ? "disabled" : ""}>${status}</button>`).join("")}
       ${item.status && item.status !== "Unreviewed" ? '<button type="button" class="secondary-button remove-status" data-status="Unreviewed">Remove status</button>' : ""}
