@@ -3,34 +3,50 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Federal Records | Rural Health Opportunity Dashboard</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260727-2">
+    <title>Federal Source Explorer | Rural Health Dashboard</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260728-4">
   </head>
   <body>
     <header class="topbar">
       <div class="brand-lockup">
         <img class="brand-logo" src="/static/gainwell-logo.png" alt="Gainwell Technologies">
         <div class="brand-title">
-          <p class="eyebrow">Policy, data, and market context</p>
-          <h1>Federal Records</h1>
+          <p class="eyebrow">Official policy, regulatory, and health data research</p>
+          <h1>Federal Source Explorer</h1>
         </div>
       </div>
-      <a class="button-link" href="/">Back to opportunities</a>
+      <a class="button-link" href="/">Back to dashboard</a>
     </header>
 
     <main>
       <section class="metrics" id="recordMetrics"></section>
 
-      <nav class="category-tabs" id="recordTabs" aria-label="Federal record categories"></nav>
+      <nav class="category-tabs" id="recordTabs" aria-label="Federal update topic filters"></nav>
 
-      <section class="toolbar records-toolbar" aria-label="Federal record filters">
+      <section class="toolbar records-toolbar" aria-label="Federal update filters">
         <label>
           Search
-          <input id="recordSearch" type="search" placeholder="Title, agency, source, keyword">
+          <input id="recordSearch" type="search" placeholder="Title, agency, docket, topic, evidence">
+        </label>
+        <label>
+          Source
+          <select id="recordSource">
+            <option value="">All sources</option>
+          </select>
+        </label>
+        <label>
+          Update type
+          <select id="recordType">
+            <option value="">All types</option>
+          </select>
         </label>
         <label>
           Published since
           <input id="recordDate" type="date">
+        </label>
+        <label>
+          Minimum importance
+          <input id="recordImportance" type="number" min="0" max="100" step="1" value="0">
         </label>
       </section>
 
@@ -38,8 +54,8 @@
         <section class="panel table-panel">
           <div class="panel-heading">
             <div>
-              <h2>Useful federal information</h2>
-              <p class="muted">These records provide policy and data context; they are not open bid opportunities.</p>
+              <h2>Federal updates and source evidence</h2>
+              <p class="muted">Research-only policy, regulatory, CMS, Medicare, Medicaid, and rural health updates. Procurement, contract, award, and grant opportunity records are excluded.</p>
             </div>
             <span id="recordCount"></span>
           </div>
@@ -47,10 +63,10 @@
             <table>
               <thead>
                 <tr>
-                  <th>Record</th>
-                  <th>Category</th>
+                  <th>Update</th>
+                  <th>Source / type</th>
                   <th>Published</th>
-                  <th>Relevance</th>
+                  <th>Importance</th>
                 </tr>
               </thead>
               <tbody id="recordRows"></tbody>
@@ -59,11 +75,11 @@
         </section>
 
         <aside class="panel detail-panel" id="recordDetail">
-          <p class="muted">Select a federal record to review its details.</p>
+          <p class="muted">Select a federal update to inspect its research evidence, provenance, and official source links.</p>
         </aside>
       </section>
     </main>
 
-    <script src="/static/federal-records.js?v=20260723-3"></script>
+    <script src="/static/federal-records.js?v=20260728-1"></script>
   </body>
 </html>
