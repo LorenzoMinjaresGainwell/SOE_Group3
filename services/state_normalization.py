@@ -197,9 +197,26 @@ def compact_raw_json(value: Any, *, limit: int = 5000) -> str:
         text = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"), default=str)
     except (TypeError, ValueError):
         text = json.dumps(str(value), ensure_ascii=True)
-    if limit > 0 and len(text) > limit:
-        return text[: max(0, limit - 3)].rstrip() + "..."
-    return text
+    if limit <= 0 or len(text) <= limit:
+        return text
+
+    # Keep the field valid JSON when retaining only an excerpt. Cutting the
+    # serialized value directly can leave malformed JSON in generated CSVs.
+    marker = {"_truncated": True, "preview": ""}
+    empty = json.dumps(marker, ensure_ascii=True, separators=(",", ":"))
+    if len(empty) > limit:
+        return "null"
+    low, high = 0, len(text)
+    while low < high:
+        middle = (low + high + 1) // 2
+        marker["preview"] = text[:middle]
+        encoded = json.dumps(marker, ensure_ascii=True, separators=(",", ":"))
+        if len(encoded) <= limit:
+            low = middle
+        else:
+            high = middle - 1
+    marker["preview"] = text[:low]
+    return json.dumps(marker, ensure_ascii=True, separators=(",", ":"))
 
 
 def compact_raw_subset(row: dict[str, Any], keys: list[str], *, limit: int = 5000) -> str:

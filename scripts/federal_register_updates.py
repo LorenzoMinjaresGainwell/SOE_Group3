@@ -19,7 +19,6 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from services.federal_register_client import (  # noqa: E402
-    DEFAULT_KEYWORDS,
     FEDERAL_REGISTER_CSV_FIELDS,
     RELATED_API_NOTES,
     FederalRegisterConfig,
@@ -28,6 +27,7 @@ from services.federal_register_client import (  # noqa: E402
     upsert_federal_register_updates,
     write_csv,
 )
+from services.search_taxonomy import load_search_taxonomy  # noqa: E402
 
 
 def parse_date(value: str) -> dt.date | None:
@@ -42,7 +42,8 @@ def split_csv(value: str) -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fetch CMS/HHS Federal Register updates.")
-    parser.add_argument("--keywords", default=",".join(DEFAULT_KEYWORDS), help="comma list of search keywords")
+    parser.add_argument("--params", default="data/search_parameters.json")
+    parser.add_argument("--keywords", default="", help="comma list; defaults to the monitored business taxonomy")
     parser.add_argument("--days-back", type=int, default=365, help="lookback window when --start-date is omitted")
     parser.add_argument("--start-date", default="", help="YYYY-MM-DD; overrides --days-back")
     parser.add_argument("--end-date", default="", help="YYYY-MM-DD; defaults to today")
@@ -56,7 +57,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    keywords = split_csv(args.keywords)
+    keywords = split_csv(args.keywords) or load_search_taxonomy(ROOT / args.params).business_terms
     if not keywords:
         print("No keywords provided.", file=sys.stderr)
         return 2

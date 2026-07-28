@@ -17,7 +17,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from services.gov_api_client import DEFAULT_KEYWORDS, SearchConfig, run_gov_search  # noqa: E402
+from services.gov_api_client import SearchConfig, run_gov_search  # noqa: E402
+from services.search_taxonomy import load_search_taxonomy  # noqa: E402
 
 DEFAULT_SOURCES = "sam,grants,federal_register,medicaid,cms_provider,usaspending"
 
@@ -60,7 +61,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Search gov APIs and update dashboard CSVs.")
     parser.add_argument("--mode", choices=["continue", "historic"], default="continue")
     parser.add_argument("--sources", default=DEFAULT_SOURCES, help="comma list of source keys")
-    parser.add_argument("--keywords", default=",".join(DEFAULT_KEYWORDS), help="comma list of business keywords")
+    parser.add_argument("--keywords", default="", help="comma list; defaults to the monitored business taxonomy")
     parser.add_argument("--max-per-source", type=int, default=25)
     parser.add_argument("--days-back", type=int, default=60, help="used before a source has a previous run")
     parser.add_argument("--overlap-days", type=int, default=14, help="continue mode overlap after last run")
@@ -98,7 +99,7 @@ def main() -> int:
     config = SearchConfig(
         mode=args.mode,
         sources=split_csv(args.sources),
-        keywords=split_csv(args.keywords),
+        keywords=split_csv(args.keywords) or load_search_taxonomy().business_terms,
         max_per_source=args.max_per_source,
         days_back=args.days_back,
         overlap_days=args.overlap_days,

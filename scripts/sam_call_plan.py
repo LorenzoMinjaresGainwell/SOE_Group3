@@ -16,26 +16,14 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from services.sam_cache import redacted_request  # noqa: E402
+from services.search_taxonomy import load_search_taxonomy  # noqa: E402
 
 OPPORTUNITIES_URL = "https://api.sam.gov/opportunities/v2/search"
 AWARDS_URL = "https://api.sam.gov/contract-awards/v1/search"
 ENTITIES_URL = "https://api.sam.gov/entity-information/v4/entities"
 MAX_FIRST_DAY_CALLS = 10
 
-LOCAL_KEYWORDS = [
-    "Medicaid",
-    "Medicare",
-    "CMS",
-    "MMIS",
-    "claims",
-    "eligibility",
-    "managed care",
-    "interoperability",
-    "FHIR",
-    "provider data",
-    "rural health",
-    "rural health transformation",
-]
+LOCAL_KEYWORDS = load_search_taxonomy().business_terms
 LOCAL_AGENCIES = ["HHS", "CMS", "HRSA", "ACL", "AHRQ", "CDC"]
 
 

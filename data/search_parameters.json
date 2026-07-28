@@ -1,4 +1,57 @@
 {
+  "taxonomy": {
+    "rht_explicit": [
+      "rural health transformation",
+      "rural health transformation program",
+      "RHTP",
+      "RHT"
+    ],
+    "rht_direct": [
+      "rural health",
+      "rural hospital",
+      "rural provider",
+      "rural community",
+      "critical access hospital"
+    ],
+    "rht_related": [
+      "telehealth",
+      "behavioral health",
+      "workforce",
+      "population health",
+      "health equity"
+    ],
+    "health_programs": [
+      "Medicaid",
+      "Medicare",
+      "CMS",
+      "CHIP",
+      "MMIS",
+      "1115 waiver",
+      "state plan amendment"
+    ],
+    "gainwell_capabilities": [
+      "claims",
+      "eligibility",
+      "enrollment",
+      "managed care",
+      "interoperability",
+      "FHIR",
+      "prior authorization",
+      "contact center",
+      "provider data",
+      "quality measures"
+    ],
+    "negative_noise": [
+      "job",
+      "jobs",
+      "career",
+      "careers",
+      "training",
+      "webinar",
+      "conference",
+      "provider bulletin"
+    ]
+  },
   "monitored_keywords": [
     "Medicaid",
     "Medicare",

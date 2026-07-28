@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import email.utils
+import hashlib
 import html
 import re
 import urllib.parse
@@ -18,6 +19,10 @@ DATE_RE = re.compile(
     r"|\b\d{1,2}/\d{1,2}/\d{4}\b"
     r"|\b\d{1,2}-\d{1,2}-\d{4}\b"
     r"|\b20\d{2}-\d{2}-\d{2}\b",
+    re.I,
+)
+PROCUREMENT_RE = re.compile(
+    r"\b(?:rfp|rfq|itb|solicitations?|bids?|awards?|procurements?|contracts?|re[- ]?competes?)\b",
     re.I,
 )
 
@@ -203,8 +208,21 @@ def strip_query(url: str) -> str:
 
 
 def source_id_from_url(url: str) -> str:
-    parts = urllib.parse.urlsplit(strip_query(url))
-    return clean_text(parts.path.strip("/")).replace("/", ":")[:240]
+    parts = urllib.parse.urlsplit(url)
+    path_id = clean_text(urllib.parse.unquote(parts.path).strip("/")).replace("/", ":")
+    if not parts.query:
+        return path_id[:240]
+    # Query parameters frequently carry the only item identity (for example,
+    # ``download?id=123``). Hash them rather than dropping them or persisting
+    # potentially sensitive parameter values.
+    query_hash = hashlib.sha256(parts.query.encode("utf-8")).hexdigest()[:16]
+    return f"{path_id[:217]}:query-{query_hash}".lstrip(":")
+
+
+def is_procurement_update(*values: str) -> bool:
+    """Match procurement language in human text and percent-decoded URLs."""
+    text = " ".join(urllib.parse.unquote(str(value or "")) for value in values)
+    return bool(PROCUREMENT_RE.search(text))
 
 
 def title_from_url(url: str) -> str:

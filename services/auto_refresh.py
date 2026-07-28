@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any
 
 from services.csv_store import CsvStore
-from services.gov_api_client import DEFAULT_KEYWORDS, SOURCE_META, SearchConfig, run_gov_search
+from services.gov_api_client import SOURCE_META, SearchConfig, run_gov_search
+from services.search_taxonomy import load_search_taxonomy, ordered_dedupe
 from services.state_contracts import STATE_CLIENTS as STATE_CONTRACT_CLIENTS
 from services.state_contracts.store import upsert_state_contracts
 from services.state_opportunities import STATE_CLIENTS as STATE_OPPORTUNITY_CLIENTS
@@ -81,7 +82,7 @@ class AutoRefresh:
                 SearchConfig(
                     mode="continue",
                     sources=list(AUTO_SOURCES),
-                    keywords=DEFAULT_KEYWORDS,
+                    keywords=load_search_taxonomy(self.data_dir / "search_parameters.json").business_terms,
                     max_per_source=100,
                     sam_quota_mode="cache-only",
                     sam_live_budget=0,
@@ -183,10 +184,11 @@ def apply_changes(records: list[dict[str, Any]], changes: dict[str, dict[str, An
 
 
 def refresh_state_data(data_dir: Path) -> dict[str, Any]:
-    params = load_search_parameters(data_dir / "search_parameters.json")
-    keywords = [str(value) for value in params.get("monitored_keywords") or DEFAULT_KEYWORDS]
+    params_path = data_dir / "search_parameters.json"
+    params = load_search_parameters(params_path)
+    keywords = load_search_taxonomy(params_path).business_terms
     vendors = vendor_searches(params)
-    vendor_terms = sorted({query for vendor in vendors for query in vendor.queries})
+    vendor_terms = ordered_dedupe(query for vendor in vendors for query in vendor.queries)
     opportunity_records: list[dict[str, str]] = []
     contract_records: list[dict[str, str]] = []
     sources: list[dict[str, Any]] = []

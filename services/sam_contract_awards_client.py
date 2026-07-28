@@ -14,6 +14,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from services.search_taxonomy import (
+    load_search_parameters as load_taxonomy_parameters,
+    load_search_taxonomy,
+)
 from services.sam_cache import DEFAULT_SAM_LEDGER_PATH, DEFAULT_SAM_RAW_CACHE_DIR, RawSAMCache
 from services.sam_quota import SAMLiveCallBlocked, SAMQuotaError, SAMQuotaGuard, policy_from_settings
 
@@ -186,7 +190,7 @@ def fetch_sam_contract_awards(
 
     params = load_search_parameters(config.params_path)
     vendors = configured_vendors(params, config.vendors_override, config.vendor_group)
-    keywords = config.keywords or [str(item) for item in params.get("monitored_keywords") or []]
+    keywords = config.keywords or load_search_taxonomy(config.params_path).business_terms
     specs = build_search_specs(config, vendors, keywords)
     if sam_live_enabled(config):
         specs = [spec for spec in specs if spec.kind in {"agency_signed", "agency_expiring"} and not spec.deleted]
@@ -759,10 +763,7 @@ def summarize_sam_awards(rows: list[dict[str, str]]) -> dict[str, Any]:
 
 
 def load_search_parameters(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    with path.open(encoding="utf-8") as handle:
-        return json.load(handle)
+    return load_taxonomy_parameters(path)
 
 
 def load_vendor_entities(path: Path) -> list[dict[str, str]]:

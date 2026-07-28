@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from services.search_taxonomy import load_search_taxonomy, matching_terms
+
 CATALOG_FIELDS = [
     "update_id",
     "source_key",
@@ -89,15 +91,7 @@ TOPIC_RULES = [
     ("grant", "rht", ["grant", "funding opportunity", "cooperative agreement"]),
 ]
 
-RHT_TERMS = {
-    "rural health transformation",
-    "rural health",
-    "critical access hospital",
-    "frontier",
-    "rural hospital",
-    "telehealth",
-    "provider shortage",
-}
+RHT_TERMS = tuple(load_search_taxonomy().rht_terms)
 
 TRUE_VALUES = {"1", "true", "yes", "y", "open"}
 FALSE_VALUES = {"0", "false", "no", "n", "closed"}
@@ -828,20 +822,12 @@ def read_csv(path: Path) -> list[dict[str, str]]:
 
 
 def load_context(search_parameters_path: Path) -> CatalogContext:
-    if not search_parameters_path.exists():
-        return CatalogContext(monitored_keywords=[], vendor_aliases={})
-    data = json.loads(search_parameters_path.read_text(encoding="utf-8"))
-    keywords = [str(item) for item in data.get("monitored_keywords") or []]
-    vendor_aliases: dict[str, list[str]] = {}
-    for vendor in data.get("vendors") or []:
-        name = str(vendor.get("name") or "").strip()
-        if not name:
-            continue
-        key = vendor_key_from_name(name)
-        aliases = [name]
-        aliases.extend(str(alias) for alias in vendor.get("aliases") or [])
-        vendor_aliases[key] = [alias for alias in aliases if alias]
-    return CatalogContext(monitored_keywords=keywords, vendor_aliases=vendor_aliases)
+    taxonomy = load_search_taxonomy(search_parameters_path)
+    vendor_aliases = {
+        vendor_key_from_name(taxonomy.canonical_names[key]): list(aliases)
+        for key, aliases in taxonomy.aliases_by_organization.items()
+    }
+    return CatalogContext(monitored_keywords=taxonomy.business_terms, vendor_aliases=vendor_aliases)
 
 
 def base_evidence(
@@ -919,13 +905,7 @@ def merge_classification(text: str, topic_value: Any, focus_value: Any) -> tuple
 
 
 def keyword_matches(text: str, keywords: list[str]) -> list[str]:
-    lower = text.lower()
-    hits = []
-    for keyword in keywords:
-        keyword_text = str(keyword).strip()
-        if keyword_text and keyword_text.lower() in lower:
-            hits.append(keyword_text)
-    return unique_sorted(hits)
+    return matching_terms(text, keywords)
 
 
 def vendor_keys(text: str, aliases_by_key: dict[str, list[str]]) -> list[str]:
@@ -938,8 +918,7 @@ def vendor_keys(text: str, aliases_by_key: dict[str, list[str]]) -> list[str]:
 
 
 def has_rht_signal(text: str) -> bool:
-    lower = text.lower()
-    return any(term in lower for term in RHT_TERMS)
+    return bool(matching_terms(text, RHT_TERMS))
 
 
 def looks_like_award_notice(notice_type: str, ptype: str) -> bool:

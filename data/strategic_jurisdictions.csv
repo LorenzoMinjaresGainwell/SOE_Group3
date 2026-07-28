@@ -1,0 +1,22 @@
+jurisdiction,priority,reason
+US,0.70,Federal health programs have broad strategic reach
+AZ,0.85,Priority Medicaid and rural-health market
+CA,0.75,Large public health and Medicaid market
+FL,0.80,Large Medicaid market
+GA,0.85,Priority Medicaid and rural-health market
+IL,0.75,Large public health and Medicaid market
+IN,0.85,Priority Medicaid market
+KY,0.90,Priority rural-health and Medicaid market
+MA,0.75,Health transformation market
+MI,0.85,Priority Medicaid market
+NC,0.90,Priority Medicaid and rural-health market
+NM,0.90,Priority rural-health market
+NY,0.75,Large public health and Medicaid market
+OH,0.90,Priority Medicaid market
+PA,0.80,Large Medicaid market
+PR,0.80,Strategic territory health market
+TN,0.85,Priority Medicaid market
+TX,1.00,Top strategic Medicaid and health market
+VA,0.85,Priority public health market
+WA,0.80,Health transformation market
+WV,0.90,Priority rural-health market

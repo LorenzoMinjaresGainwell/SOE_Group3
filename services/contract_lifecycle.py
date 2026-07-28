@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from services.search_taxonomy import load_search_taxonomy
+
 LIFECYCLE_FIELDS = [
     "contract_id",
     "source_keys",
@@ -54,47 +56,11 @@ DEFAULT_OPTIONAL_INPUTS = {
     "vendor_entities": "data/vendor_entities.csv",
 }
 
-DEFAULT_KEYWORDS = [
-    "Medicaid",
-    "Medicare",
-    "CMS",
-    "MMIS",
-    "claims",
-    "eligibility",
-    "enrollment",
-    "managed care",
-    "interoperability",
-    "FHIR",
-    "prior authorization",
-    "contact center",
-    "provider data",
-    "quality measures",
-    "rural health",
-    "rural health transformation",
-    "critical access hospital",
-    "telehealth",
-    "behavioral health",
-    "workforce",
-]
-
-DEFAULT_VENDOR_ALIASES = {
-    "gainwell_technologies": [
-        "Gainwell Technologies",
-        "Gainwell",
-        "Gainwell Technologies LLC",
-        "Health Management Systems",
-        "Health Management Systems Inc",
-        "DXC Technology Services LLC",
-    ],
-    "maximus": ["MAXIMUS", "MAXIMUS Federal Services", "MAXIMUS Federal Services Inc"],
-    "deloitte": ["Deloitte", "Deloitte Consulting", "Deloitte Consulting LLP"],
-    "accenture_federal_services": ["Accenture Federal Services", "Accenture LLP"],
-    "optum": ["Optum", "OptumServe", "OptumServe Technology Services"],
-    "conduent": ["Conduent", "Conduent State Healthcare"],
-}
+LIFECYCLE_TAXONOMY = load_search_taxonomy()
+DEFAULT_KEYWORDS = LIFECYCLE_TAXONOMY.business_terms
 
 PREDECESSOR_TERMS = ("health management systems", "dxc")
-COMPETITOR_KEYS = {"maximus", "deloitte", "accenture_federal_services", "optum", "conduent"}
+COMPETITOR_KEYS = set(LIFECYCLE_TAXONOMY.aliases_by_organization) - {"gainwell"}
 
 TOPIC_RULES = [
     ("rht", "rht", ["rural health transformation", "rht"]),
@@ -802,21 +768,26 @@ def truthy(value_text: str) -> bool:
 
 
 def load_context(path: Path, *, recompete_months: int | None = None) -> LifecycleContext:
-    params: dict[str, Any] = {}
-    if path.exists():
-        with path.open(encoding="utf-8") as handle:
-            params = json.load(handle)
+    taxonomy = load_search_taxonomy(path)
+    params = dict(taxonomy.raw_parameters)
     usaspending = params.get("usaspending") if isinstance(params.get("usaspending"), dict) else {}
     configured_months = int_or_none(usaspending.get("recompete_months")) if usaspending else None
+    aliases = {
+        "gainwell_technologies" if key == "gainwell" else key: list(values)
+        for key, values in taxonomy.aliases_by_organization.items()
+    }
     return LifecycleContext(
-        keywords=[str(item) for item in params.get("monitored_keywords") or DEFAULT_KEYWORDS],
-        vendor_aliases=vendor_alias_map(params),
+        keywords=taxonomy.business_terms,
+        vendor_aliases=aliases or vendor_alias_map(params),
         recompete_months=recompete_months or configured_months or 36,
     )
 
 
 def vendor_alias_map(params: dict[str, Any]) -> dict[str, list[str]]:
-    aliases = {key: list(values) for key, values in DEFAULT_VENDOR_ALIASES.items()}
+    aliases = {
+        "gainwell_technologies" if key == "gainwell" else key: list(values)
+        for key, values in LIFECYCLE_TAXONOMY.aliases_by_organization.items()
+    }
     for item in params.get("vendors") or []:
         if isinstance(item, str):
             key = vendor_key_for_name(item)

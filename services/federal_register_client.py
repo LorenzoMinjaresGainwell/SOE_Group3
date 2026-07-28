@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from services.search_taxonomy import load_search_taxonomy, matching_terms
+
 FEDERAL_REGISTER_DOCUMENTS_URL = "https://www.federalregister.gov/api/v1/documents.json"
 USER_AGENT = "soe-group3-federal-register/0.1"
 SOURCE_NAME = "Federal Register"
@@ -53,21 +55,8 @@ FEDERAL_REGISTER_CSV_FIELDS = [
     "raw_json",
 ]
 
-DEFAULT_KEYWORDS = [
-    "Medicaid",
-    "Medicare",
-    "CMS",
-    "rural health",
-    "rural health transformation",
-    "interoperability",
-    "prior authorization",
-    "managed care",
-    "waiver",
-    "1115",
-    "eligibility",
-    "enrollment",
-    "quality measures",
-]
+# Compatibility export; agency slugs and API field vocabulary remain source-specific below.
+DEFAULT_KEYWORDS = load_search_taxonomy().business_terms
 
 DEFAULT_AGENCY_SLUGS = [
     "centers-for-medicare-medicaid-services",
@@ -305,9 +294,7 @@ def agency_names(agencies: Any) -> str:
 
 
 def keyword_hits(text: str, keywords: list[str]) -> list[str]:
-    lower = text.lower()
-    hits = {keyword for keyword in keywords if keyword and keyword.lower() in lower}
-    return sorted(hits, key=str.lower)
+    return matching_terms(text, keywords)
 
 
 def relevance_score(keywords: list[str], document_type: str, agency: str, docket_ids: str, comment_close_date: Any) -> int:

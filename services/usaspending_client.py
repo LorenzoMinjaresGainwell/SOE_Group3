@@ -11,6 +11,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from services.search_taxonomy import (
+    load_search_parameters as load_taxonomy_parameters,
+    load_search_taxonomy,
+    matching_terms,
+    ordered_dedupe,
+)
+
 USASPENDING_AWARDS_URL = "https://api.usaspending.gov/api/v2/search/spending_by_award/"
 USASPENDING_SEARCH_FLOOR = dt.date(2007, 10, 1)
 USER_AGENT = "soe-group3-usaspending/0.1"
@@ -51,28 +58,8 @@ AWARD_FIELDS = [
     "psc_code",
 ]
 
-DEFAULT_KEYWORDS = [
-    "Medicaid",
-    "Medicare",
-    "CMS",
-    "MMIS",
-    "claims",
-    "eligibility",
-    "enrollment",
-    "managed care",
-    "interoperability",
-    "FHIR",
-    "prior authorization",
-    "contact center",
-    "provider data",
-    "quality measures",
-    "rural health",
-    "rural health transformation",
-    "critical access hospital",
-    "telehealth",
-    "behavioral health",
-    "workforce",
-]
+# Compatibility export for older callers; the validated loader is authoritative.
+DEFAULT_KEYWORDS = load_search_taxonomy().business_terms
 
 
 @dataclass
@@ -97,10 +84,8 @@ class USASpendingConfig:
 
 
 def load_search_parameters(path: Path) -> dict[str, Any]:
-    if not path.exists():
-        return {}
-    with path.open(encoding="utf-8") as handle:
-        return json.load(handle)
+    """Backward-compatible config reader routed through taxonomy validation."""
+    return load_taxonomy_parameters(path)
 
 
 def config_from_parameters(
@@ -120,7 +105,8 @@ def config_from_parameters(
     start = max(start_date or (end - dt.timedelta(days=365 * years)), USASPENDING_SEARCH_FLOOR)
 
     vendors = vendor_searches(params, vendors_override)
-    keywords = [str(item) for item in params.get("monitored_keywords") or DEFAULT_KEYWORDS]
+    configured_keywords = params.get("monitored_keywords")
+    keywords = ordered_dedupe(configured_keywords) if configured_keywords else load_search_taxonomy().business_terms
 
     return USASpendingConfig(
         vendors=vendors,
@@ -141,6 +127,11 @@ def vendor_searches(params: dict[str, Any], vendors_override: list[str] | None =
     if vendors_override:
         return [VendorSearch(name=name, queries=[name]) for name in vendors_override if name]
 
+    taxonomy = load_search_taxonomy()
+    central_aliases = {
+        taxonomy.canonical_names[key].casefold(): aliases
+        for key, aliases in taxonomy.aliases_by_organization.items()
+    }
     searches: list[VendorSearch] = []
     for item in params.get("vendors") or []:
         if isinstance(item, str):
@@ -152,7 +143,7 @@ def vendor_searches(params: dict[str, Any], vendors_override: list[str] | None =
         if not name:
             continue
         aliases = [str(alias).strip() for alias in item.get("aliases") or [] if str(alias).strip()]
-        queries = sorted({name, *aliases}, key=str.lower)
+        queries = ordered_dedupe([name, *central_aliases.get(name.casefold(), ()), *aliases])
         searches.append(VendorSearch(name=name, queries=queries))
     return searches
 
@@ -330,8 +321,7 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> 
 
 
 def keyword_hits(text: str, keywords: list[str]) -> list[str]:
-    lower = text.lower()
-    return sorted({keyword for keyword in keywords if keyword and keyword.lower() in lower}, key=str.lower)
+    return matching_terms(text, keywords)
 
 
 def relevance_score(keywords: list[str], award_amount: int, recompete: str) -> int:

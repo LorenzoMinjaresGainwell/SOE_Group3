@@ -1,0 +1,46 @@
+profile_order,organization_key,canonical_name,organization_type,alias,alias_type
+1,gainwell,Gainwell Technologies,gainwell,Gainwell Technologies,canonical
+1,gainwell,Gainwell Technologies,gainwell,Gainwell Technologies LLC,legal_name
+1,gainwell,Gainwell Technologies,gainwell,Gainwell,brand
+1,gainwell,Gainwell Technologies,gainwell,Health Management Systems,predecessor
+1,gainwell,Gainwell Technologies,gainwell,Health Management Systems Inc,predecessor
+1,gainwell,Gainwell Technologies,gainwell,HMS Holdings Corp,predecessor
+1,gainwell,Gainwell Technologies,gainwell,HMS,predecessor
+1,gainwell,Gainwell Technologies,gainwell,DXC Technology Services,predecessor
+1,gainwell,Gainwell Technologies,gainwell,DXC Technology Services LLC,predecessor
+1,gainwell,Gainwell Technologies,gainwell,DXC MS LLC,predecessor
+1,gainwell,Gainwell Technologies,gainwell,Hewlett Packard Enterprise Services,predecessor
+1,gainwell,Gainwell Technologies,gainwell,Hewlett Packard Enterprise Services LLC,predecessor
+1,gainwell,Gainwell Technologies,gainwell,HP Enterprise Services,predecessor
+1,gainwell,Gainwell Technologies,gainwell,HP Enterprise Services LLC,predecessor
+2,maximus,MAXIMUS,competitor,MAXIMUS,canonical
+2,maximus,MAXIMUS,competitor,MAXIMUS Federal Services,legal_name
+2,maximus,MAXIMUS,competitor,MAXIMUS Federal Services Inc,legal_name
+3,deloitte,Deloitte,competitor,Deloitte,canonical
+3,deloitte,Deloitte,competitor,Deloitte Consulting,legal_name
+3,deloitte,Deloitte,competitor,Deloitte Consulting LLP,legal_name
+3,deloitte,Deloitte,competitor,Deloitte and Touche,legal_name
+4,accenture,Accenture,competitor,Accenture,canonical
+4,accenture,Accenture,competitor,Accenture LLP,legal_name
+4,accenture,Accenture,competitor,Accenture Federal Services,legal_name
+4,accenture,Accenture,competitor,Accenture Federal Services LLC,legal_name
+5,optum,Optum,competitor,Optum,canonical
+5,optum,Optum,competitor,OptumInsight,brand
+5,optum,Optum,competitor,OptumServe,brand
+5,optum,Optum,competitor,OptumServe Technology Services,legal_name
+6,conduent,Conduent,competitor,Conduent,canonical
+6,conduent,Conduent,competitor,Conduent State Healthcare,legal_name
+6,conduent,Conduent,competitor,Conduent State Healthcare LLC,legal_name
+7,acentra,Acentra,competitor,Acentra,canonical
+7,acentra,Acentra,competitor,Acentra Health,brand
+7,acentra,Acentra,competitor,CNSI,predecessor
+7,acentra,Acentra,competitor,CNSI LLC,predecessor
+7,acentra,Acentra,competitor,Client Network Services Inc,predecessor
+8,pcg,Public Consulting Group,competitor,Public Consulting Group,canonical
+8,pcg,Public Consulting Group,competitor,Public Consulting Group LLC,legal_name
+8,pcg,Public Consulting Group,competitor,PCG,brand
+9,cgi,CGI,competitor,CGI,canonical
+9,cgi,CGI,competitor,CGI Federal,legal_name
+9,cgi,CGI,competitor,CGI Federal Inc,legal_name
+9,cgi,CGI,competitor,CGI Technologies and Solutions,legal_name
+9,cgi,CGI,competitor,CGI Technologies and Solutions Inc,legal_name

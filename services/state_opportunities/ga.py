@@ -62,7 +62,7 @@ class GeorgiaGprClient:
         attachments = [href for href in hrefs if "downloadAttachment" in href]
         return detail_url, dedupe(public_events), dedupe(attachments)
 
-    def _request_text(self, url: str, *, data: bytes | None = None, referer: str, timeout: int = 60) -> tuple[str, str]:
+    def _request_text(self, url: str, *, data: bytes | None = None, referer: str, timeout: int = 60, byte_limit: int = 5_000_000) -> tuple[str, str]:
         headers = {
             "User-Agent": USER_AGENT,
             "Accept": "application/json, text/javascript, */*; q=0.01" if data is not None else "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -77,7 +77,10 @@ class GeorgiaGprClient:
             try:
                 request = urllib.request.Request(url, data=data, headers=headers)
                 with self.opener.open(request, timeout=timeout) as response:
-                    return response.read().decode("utf-8", "replace"), response.geturl()
+                    body = response.read(byte_limit + 1)
+                    if len(body) > byte_limit:
+                        raise RuntimeError(f"GA GPR response exceeded {byte_limit} bytes")
+                    return body.decode("utf-8", "replace"), response.geturl()
             except (OSError, TimeoutError, json.JSONDecodeError) as exc:
                 last_error = exc
                 time.sleep(1 + attempt)

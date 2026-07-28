@@ -7,6 +7,27 @@ from typing import Any, Callable
 from services.state_contracts import ak, al, ar, az, ca, co, fl, il, ma, mi, nj, pa, pr, tn, tx, vt, wy
 
 or_contracts = importlib.import_module("services.state_contracts.or")
+_NEW_STATE_MODULES = {
+    state: importlib.import_module(f"services.state_contracts.{module}")
+    for state, module in {
+        "DC": "dc",
+        "DE": "de",
+        "GA": "ga",
+        "IA": "ia",
+        "ID": "id",
+        "IN": "in",
+        "LA": "la",
+        "MD": "md",
+        "MO": "mo",
+        "NC": "nc",
+        "NY": "ny",
+        "OK": "ok",
+        "UT": "ut",
+        "VA": "va",
+        "WA": "wa",
+        "WV": "wv",
+    }.items()
+}
 
 STATE_CLIENTS = {
     "AK": ak.fetch_contracts,
@@ -27,6 +48,7 @@ STATE_CLIENTS = {
     "TX": tx.fetch_contracts,
     "VT": vt.fetch_contracts,
     "WY": wy.fetch_contracts,
+    **{state: module.fetch_contracts for state, module in _NEW_STATE_MODULES.items()},
 }
 
 

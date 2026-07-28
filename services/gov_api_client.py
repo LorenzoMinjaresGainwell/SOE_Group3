@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from services.search_taxonomy import load_search_taxonomy, matching_terms, ordered_dedupe
 from services.sam_cache import DEFAULT_SAM_LEDGER_PATH, DEFAULT_SAM_RAW_CACHE_DIR, RawSAMCache
 from services.sam_quota import SAMLiveCallBlocked, SAMQuotaError, SAMQuotaGuard, policy_from_settings
 from services.usaspending_client import (
@@ -138,34 +139,13 @@ SOURCE_RUN_FIELDS = [
     "message",
 ]
 
-DEFAULT_KEYWORDS = [
-    "medicaid",
-    "medicare",
-    "CMS",
-    "rural health",
-    "rural health transformation",
-    "RFP",
-    "RFI",
-    "solicitation",
-    "sources sought",
-    "grant",
-    "waiver",
-    "1115",
-    "SPA",
-    "managed care",
-    "MMIS",
-    "eligibility",
-    "enrollment",
-    "claims",
-    "interoperability",
-    "FHIR",
-    "prior authorization",
-    "provider data",
-    "quality measures",
-    "telehealth",
-    "behavioral health",
-    "workforce",
+SEARCH_TAXONOMY = load_search_taxonomy()
+# Required federal API/procurement vocabulary remains local; business terms do not.
+FEDERAL_QUERY_CONTEXT_TERMS = [
+    "RFP", "RFI", "solicitation", "sources sought", "grant", "waiver", "1115", "SPA",
 ]
+# Compatibility export used by existing callers and CLI imports.
+DEFAULT_KEYWORDS = ordered_dedupe([*SEARCH_TAXONOMY.business_terms, *FEDERAL_QUERY_CONTEXT_TERMS])
 
 SOURCE_META = {
     "sam": {
@@ -245,29 +225,17 @@ SAM_TARGET_AGENCY_TERMS = [
     "centers for disease control",
     "cdc",
 ]
-SAM_HIGH_VALUE_TERMS = {
-    "medicaid",
-    "medicare",
-    "cms",
-    "mmis",
-    "claims",
-    "eligibility",
-    "rural health",
-    "rural health transformation",
-    "critical access hospital",
-}
+SAM_HIGH_VALUE_TERMS = set(
+    term.casefold()
+    for term in SEARCH_TAXONOMY.terms(
+        "rht_explicit", "rht_direct", "health_programs", "gainwell_capabilities"
+    )
+)
 SAM_APPROVED_LIVE_PTYPES = {"o", "k", "r", "p", "a"}
 
 GRANTS_FETCH_ENDPOINT = "https://api.grants.gov/v1/api/fetchOpportunity"
 GRANTS_DEFAULT_AGENCIES = "HHS-CMS|HHS-HRSA"
-GRANTS_RHT_TERMS = [
-    "rural health transformation",
-    "rht",
-    "rural health",
-    "rural hospital",
-    "critical access hospital",
-    "frontier",
-]
+GRANTS_RHT_TERMS = ordered_dedupe([*SEARCH_TAXONOMY.rht_terms, "frontier"])
 
 KEYWORD_WEIGHTS = {
     "rfp": 15,
@@ -941,9 +909,12 @@ def fetch_usaspending(config: SearchConfig) -> list[dict[str, str]]:
         return []
 
     start, end = date_window(config, "usaspending")
+    params = load_search_parameters(config.data_dir / "search_parameters.json")
+    configured = {vendor.name.casefold(): vendor for vendor in vendor_searches(params)}
+    vendor_specs = [configured.get(vendor.casefold(), VendorSearch(name=vendor, queries=[vendor])) for vendor in vendors]
     contracts = fetch_vendor_contracts(
         USASpendingConfig(
-            vendors=[VendorSearch(name=vendor, queries=[vendor]) for vendor in vendors],
+            vendors=vendor_specs,
             keywords=config.keywords or DEFAULT_KEYWORDS,
             start_date=start,
             end_date=end,
@@ -1690,9 +1661,7 @@ def clean_text(value: Any, limit: int) -> str:
 
 
 def keyword_hits(text: str, keywords: list[str]) -> list[str]:
-    lower = text.lower()
-    hits = {keyword for keyword in keywords if keyword and keyword.lower() in lower}
-    return sorted(hits, key=str.lower)
+    return matching_terms(text, keywords)
 
 
 def stable_id(source_key: str, source_record_id: str) -> str:

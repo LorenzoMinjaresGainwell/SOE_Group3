@@ -7,6 +7,7 @@ import json
 import re
 from typing import Any, Callable
 
+from services.search_taxonomy import load_search_taxonomy, matching_terms
 from services.state_updates.store import STATE_UPDATE_FIELDS
 
 TOPIC_RULES = [
@@ -31,15 +32,7 @@ TOPIC_RULES = [
     ("grant", "rht", ["grant", "funding opportunity", "cooperative agreement"]),
 ]
 
-RHT_TERMS = {
-    "rural health transformation",
-    "rural health",
-    "critical access hospital",
-    "frontier",
-    "rural hospital",
-    "telehealth",
-    "provider shortage",
-}
+RHT_TERMS = tuple(load_search_taxonomy().rht_terms)
 
 ACCEPTED_RECORD_TYPES = {
     "policy_update",
@@ -169,18 +162,11 @@ def classify_text(text: str) -> tuple[list[str], list[str]]:
 
 
 def keyword_matches(text: str, keywords: list[str]) -> list[str]:
-    lower = text.lower()
-    hits = []
-    for keyword in keywords:
-        keyword_text = str(keyword).strip()
-        if keyword_text and keyword_text.lower() in lower:
-            hits.append(keyword_text)
-    return unique_sorted(hits)
+    return matching_terms(text, keywords)
 
 
 def has_rht_signal(text: str) -> bool:
-    lower = text.lower()
-    return any(term in lower for term in RHT_TERMS)
+    return bool(matching_terms(text, RHT_TERMS))
 
 
 def score_update_text(text: str, topic_keys: list[str], rht_flag: bool, comment_required: bool) -> int:
@@ -353,13 +339,41 @@ def _register_state_clients() -> None:
         "AZ": "az",
         "CA": "ca",
         "CO": "co",
+        "CT": "ct",
+        "DC": "dc",
         "FL": "fl",
+        "GA": "ga",
+        "HI": "hi",
+        "IA": "ia",
+        "ID": "id",
+        "IN": "in",
+        "KY": "ky",
+        "LA": "la",
+        "MD": "md",
+        "ME": "me",
+        "MO": "mo",
+        "MP": "mp",
+        "MS": "ms",
+        "MT": "mt",
+        "NC": "nc",
+        "ND": "nd",
+        "NE": "ne",
+        "NM": "nm",
+        "NV": "nv",
+        "NY": "ny",
+        "OK": "ok",
         "OR": "or",
         "PR": "pr",
+        "RI": "ri",
+        "SC": "sc",
         "SD": "sd",
         "TN": "tn",
+        "UT": "ut",
         "VA": "va",
+        "VI": "vi",
         "VT": "vt",
+        "WA": "wa",
+        "WV": "wv",
         "WY": "wy",
     }.items():
         module = importlib.import_module(f"services.state_updates.{module_name}")

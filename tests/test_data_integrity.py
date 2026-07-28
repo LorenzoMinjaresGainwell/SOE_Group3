@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 import unittest
+
+from services.state_normalization import compact_raw_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,6 +18,12 @@ CONFLICT_MARKERS = ("<<<<<<<", "=======", ">>>>>>>")
 
 
 class DataIntegrityTests(unittest.TestCase):
+    def test_compact_raw_json_remains_valid_when_truncated(self):
+        encoded = compact_raw_json({"payload": "x" * 1000}, limit=120)
+
+        self.assertLessEqual(len(encoded), 120)
+        self.assertEqual(json.loads(encoded)["_truncated"], True)
+
     def test_core_csvs_have_no_merge_conflict_markers_or_malformed_rows(self):
         for path in CORE_CSVS:
             text = path.read_text(encoding="utf-8")

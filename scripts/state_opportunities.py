@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
 
 from services.state_opportunities import fetch_state_opportunities  # noqa: E402
 from services.state_opportunities.store import upsert_state_opportunities  # noqa: E402
-from services.usaspending_client import DEFAULT_KEYWORDS, load_search_parameters  # noqa: E402
+from services.search_taxonomy import load_search_taxonomy  # noqa: E402
 
 
 def split_csv(value: str) -> list[str]:
@@ -40,8 +40,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    params = load_search_parameters(ROOT / args.params)
-    keywords = split_csv(args.keywords) or [str(item) for item in params.get("monitored_keywords") or DEFAULT_KEYWORDS]
+    taxonomy = load_search_taxonomy(ROOT / args.params)
+    keywords = split_csv(args.keywords) or taxonomy.business_terms
     states = split_csv(args.states)
 
     print(

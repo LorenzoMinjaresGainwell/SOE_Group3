@@ -17,8 +17,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from services.state_contracts import fetch_state_contracts  # noqa: E402
+from services.search_taxonomy import load_search_parameters, load_search_taxonomy, ordered_dedupe  # noqa: E402
 from services.state_contracts.store import upsert_state_contracts  # noqa: E402
-from services.usaspending_client import DEFAULT_KEYWORDS, load_search_parameters, vendor_searches  # noqa: E402
+from services.usaspending_client import vendor_searches  # noqa: E402
 
 
 def split_csv(value: str) -> list[str]:
@@ -36,13 +37,13 @@ def configured_vendor_terms(params: dict, groups: list[str]) -> list[str]:
         terms.extend(str(term) for term in group_terms if str(term).strip())
 
     if terms:
-        return sorted(set(terms), key=str.lower)
+        return ordered_dedupe(terms)
 
     for vendor in vendor_searches(params):
         if selected and vendor.name.lower() not in selected:
             continue
         terms.extend(vendor.queries)
-    return sorted(set(terms), key=str.lower)
+    return ordered_dedupe(terms)
 
 
 def parse_args() -> argparse.Namespace:
@@ -69,7 +70,7 @@ def main() -> int:
         print("No vendors supplied. Use --vendors or --vendor-group.", file=sys.stderr)
         return 2
 
-    keywords = split_csv(args.keywords) or [str(item) for item in params.get("monitored_keywords") or DEFAULT_KEYWORDS]
+    keywords = split_csv(args.keywords) or load_search_taxonomy(ROOT / args.params).business_terms
     states = split_csv(args.states)
 
     print(

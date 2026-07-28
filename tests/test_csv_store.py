@@ -6,142 +6,98 @@ from pathlib import Path
 from services.csv_store import CsvStore
 
 
-class CsvStoreCategoryTests(unittest.TestCase):
+class CsvStoreOpportunityTests(unittest.TestCase):
     def setUp(self):
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.data_dir = Path(self.temp_dir.name)
+        self.temporary = tempfile.TemporaryDirectory()
+        self.data_dir = Path(self.temporary.name)
         self.store = CsvStore(self.data_dir)
 
     def tearDown(self):
-        self.temp_dir.cleanup()
+        self.temporary.cleanup()
 
     def write_csv(self, name, rows):
-        path = self.data_dir / name
-        with path.open("w", newline="", encoding="utf-8") as handle:
+        with (self.data_dir / name).open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=rows[0].keys())
             writer.writeheader()
             writer.writerows(rows)
 
-    def test_aggregates_state_federal_grant_and_contract_feeds(self):
-        self.write_csv("opportunities.csv", [
-            {
-                "id": "sam-1", "title": "Federal RFP", "state": "Federal",
-                "agency": "CMS", "source": "SAM.gov Opportunities API",
-                "document_type": "Solicitation", "fit_score": "80",
-                "budget_estimate": "100", "program_focus": "",
-                "keywords_matched": "", "risks": "",
-            },
-            {
-                "id": "grant-1", "title": "Rural health grant", "state": "Federal",
-                "agency": "HRSA", "source": "Grants.gov Search API",
-                "document_type": "Posted", "fit_score": "70",
-                "budget_estimate": "0", "program_focus": "",
-                "keywords_matched": "rural health", "risks": "",
-            },
-        ])
-        self.write_csv("state_opportunities.csv", [
-            {
-                "id": "tx-1", "title": "State RFP", "state": "TX",
-                "agency": "HHSC", "source": "TXSmartBuy", "document_type": "RFP",
-                "relevance_score": "75", "amount": "500", "matched_keywords": "Medicaid",
-            },
-        ])
-        self.write_csv("contracts.csv", [
-            {
-                "id": "award-1", "recipient_name": "Competitor", "description": "Claims",
-                "awarding_agency": "HHS", "recompete_signal": "Expiring soon",
-                "relevance_score": "65", "award_amount": "1000", "matched_keywords": "claims",
-            },
-        ])
+    def test_reads_only_canonical_opportunity_inputs(self):
+        self.write_csv("opportunities.csv", [{"id": "legacy", "title": "Legacy aggregate"}])
+        self.write_csv("contracts.csv", [{"id": "legacy-contract", "title": "Legacy contract"}])
+        self.write_csv("state_opportunities.csv", [{
+            "id": "state-1", "title": "State RFP", "state": "TX", "agency": "HHSC",
+            "source": "state portal", "document_type": "RFP", "amount": "100",
+            "relevance_score": "70", "matched_keywords": "Medicaid",
+        }])
+        self.write_csv("federal_opportunities.csv", [{
+            "opportunity_id": "federal-1", "title": "Federal RFP", "agency": "CMS",
+            "source_key": "sam_opportunities", "record_type": "opportunity", "importance_score": "80",
+        }])
+        self.write_csv("federal_grants.csv", [{
+            "grant_id": "grant-1", "opportunity_title": "Federal Grant", "agency": "HRSA",
+            "opportunity_number": "G-1", "estimated_total_program_funding": "1000", "importance_score": "75",
+        }])
 
         records = {row["id"]: row for row in self.store.list_opportunities()}
-
-        self.assertIn("federal_opportunities", records["sam-1"]["categories"])
-        self.assertIn("grants", records["grant-1"]["categories"])
-        self.assertIn("state_opportunities", records["state-opportunity-tx-1"]["categories"])
-        self.assertIn("competitor_signals", records["federal-contract-award-1"]["categories"])
-        self.assertIn("contract_expirations", records["federal-contract-award-1"]["categories"])
-
-    def test_contract_expiration_requires_actionable_recompete_window(self):
-        self.write_csv("contracts.csv", [
-            {
-                "id": "award-2", "recipient_name": "Competitor", "description": "Platform",
-                "recompete_signal": "Longer-term contract", "relevance_score": "30",
-                "award_amount": "100", "matched_keywords": "",
-            },
-        ])
-
-        record = self.store.list_opportunities()[0]
-
-        self.assertIn("competitor_signals", record["categories"])
-        self.assertNotIn("contract_expirations", record["categories"])
-
-    def test_separates_informational_federal_records_from_opportunities(self):
-        self.write_csv("opportunities.csv", [
-            {
-                "id": "sam-1", "title": "Federal RFP", "state": "Federal",
-                "agency": "CMS", "source": "SAM.gov Opportunities API",
-                "document_type": "Solicitation", "fit_score": "80",
-                "budget_estimate": "100", "program_focus": "",
-                "keywords_matched": "", "risks": "",
-            },
-            {
-                "id": "register-1", "title": "Proposed policy", "state": "Federal",
-                "agency": "CMS", "source": "Federal Register API",
-                "document_type": "Proposed Rule", "fit_score": "65",
-                "budget_estimate": "0", "program_focus": "Medicaid",
-                "keywords_matched": "Medicaid", "risks": "",
-            },
-            {
-                "id": "data-1", "title": "Eligibility dataset", "state": "Federal",
-                "agency": "CMS", "source": "data.medicaid.gov Catalog API",
-                "document_type": "Dataset", "fit_score": "55",
-                "budget_estimate": "0", "program_focus": "eligibility",
-                "keywords_matched": "eligibility", "risks": "",
-            },
-        ])
-
-        opportunity_ids = {row["id"] for row in self.store.list_opportunities()}
-        federal_records = {row["id"]: row for row in self.store.list_federal_records()}
-
-        self.assertEqual(opportunity_ids, {"sam-1"})
-        self.assertEqual(set(federal_records), {"register-1", "data-1"})
-        self.assertEqual(federal_records["register-1"]["record_category"], "policy_regulatory")
-        self.assertEqual(federal_records["data-1"]["record_category"], "medicaid_data")
+        self.assertEqual(set(records), {"state-opportunity-state-1", "federal-1", "grant-1"})
+        self.assertEqual(records["grant-1"]["opportunity_type"], "grant")
+        self.assertNotIn("legacy-contract", records)
 
     def test_api_sourced_opportunities_can_be_reviewed_and_pinned(self):
-        self.write_csv("state_opportunities.csv", [
-            {
-                "id": "tx-1", "title": "State RFP", "state": "TX",
-                "agency": "HHSC", "source": "TXSmartBuy", "document_type": "RFP",
-                "relevance_score": "75", "amount": "500", "matched_keywords": "Medicaid",
-            },
-        ])
+        self.write_csv("state_opportunities.csv", [{
+            "id": "tx-1", "title": "State RFP", "state": "TX", "agency": "HHSC",
+            "source": "state portal", "document_type": "RFP", "relevance_score": "75",
+            "amount": "500", "matched_keywords": "Medicaid",
+        }])
 
         opportunity_id = "state-opportunity-tx-1"
-        updated = self.store.update_status(opportunity_id, "Pursue")
+        self.assertEqual(self.store.update_status(opportunity_id, "Pursue")["status"], "Pursue")
         pinned = self.store.update_pinned(opportunity_id, True)
-
-        self.assertEqual(updated["status"], "Pursue")
         self.assertTrue(pinned["pinned"])
         self.assertTrue(pinned["reviewable"])
+        self.assertEqual(pinned["status_history"][-1]["to"], "Pursue")
 
-    def test_sorts_pinned_first_then_by_budget(self):
-        self.write_csv("opportunities.csv", [
-            {
-                "id": "small", "title": "Small", "state": "Federal",
-                "agency": "CMS", "source": "SAM.gov Opportunities API",
-                "document_type": "Solicitation", "fit_score": "100",
-                "budget_estimate": "100", "program_focus": "",
-                "keywords_matched": "", "risks": "",
-            },
-            {
-                "id": "large", "title": "Large", "state": "Federal",
-                "agency": "CMS", "source": "SAM.gov Opportunities API",
-                "document_type": "Solicitation", "fit_score": "10",
-                "budget_estimate": "1000", "program_focus": "",
-                "keywords_matched": "", "risks": "",
-            },
+    def test_honors_data_dir_scoring_and_competitor_configs(self):
+        custom_dir = self.data_dir / "custom"
+        custom_dir.mkdir()
+        (custom_dir / "capability_rules.csv").write_text(
+            "rule_id,category,tier,terms,strength,description\n"
+            "rht,rht,explicit,local transformation,1,Local RHT\n"
+            "special,capability,direct,custom capability,1,Local capability\n",
+            encoding="utf-8",
+        )
+        (custom_dir / "strategic_jurisdictions.csv").write_text(
+            "jurisdiction,priority,reason\nZZ,1,Local priority\n", encoding="utf-8"
+        )
+        (custom_dir / "competitor_aliases.csv").write_text(
+            "profile_order,organization_key,canonical_name,organization_type,alias,alias_type\n"
+            "1,gainwell,Gainwell Local,gainwell,Gainwell Local,canonical\n"
+            "2,localco,Local Competitor,competitor,Local Competitor,canonical\n",
+            encoding="utf-8",
+        )
+
+        custom = CsvStore(custom_dir)
+        result = custom.priority_scorer.score(
+            {"title": "Local transformation custom capability", "state": "ZZ"}, "opportunities"
+        )
+        self.assertEqual(result["rht_strength"], "explicit")
+        self.assertEqual([profile.key for profile in custom.competitor_intelligence.profiles], ["gainwell", "localco"])
+
+    def test_nonfinite_csv_numbers_fall_back_instead_of_entering_responses(self):
+        self.write_csv("federal_opportunities.csv", [{
+            "opportunity_id": "bad-number", "title": "Bad number", "award_amount": "nan",
+            "importance_score": "inf", "source_key": "sam_opportunities",
+        }])
+        record = self.store.list_opportunities()[0]
+        self.assertEqual(record["amount"], 0)
+        self.assertEqual(record["importance_score"], 0)
+
+    def test_sorts_pinned_first_then_by_amount(self):
+        self.write_csv("federal_opportunities.csv", [
+            {"opportunity_id": "small", "title": "Small", "source_key": "sam_opportunities",
+             "importance_score": "100", "award_amount": "100"},
+            {"opportunity_id": "large", "title": "Large", "source_key": "sam_opportunities",
+             "importance_score": "10", "award_amount": "1000"},
         ])
 
         self.assertEqual([row["id"] for row in self.store.list_opportunities()], ["large", "small"])

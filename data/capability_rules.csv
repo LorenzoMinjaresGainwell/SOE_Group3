@@ -1,0 +1,13 @@
+rule_id,category,tier,terms,strength,description
+rht_explicit,rht,explicit,rural health transformation|rural health transformation program|rhtp|rht,1.00,Explicit RHT language or flag
+rht_direct,rht,direct,rural health|rural hospital|rural provider|rural community,0.80,Direct rural health delivery language
+rht_related,rht,related,medicaid|medicare|healthcare transformation|health care transformation|population health|health equity,0.45,Related public health program language
+rht_generic,rht,generic,health|human services|provider,0.20,Generic health language
+claims,capability,direct,claims processing|claims system|claims administration|mmis,1.00,Claims and MMIS delivery
+eligibility,capability,direct,eligibility|enrollment|integrated eligibility,1.00,Eligibility and enrollment systems
+interoperability,capability,direct,interoperability|health information exchange|fhir|api,1.00,Interoperability and integration
+analytics,capability,direct,analytics|data warehouse|business intelligence|quality measurement,0.90,Data and analytics
+program_integrity,capability,direct,program integrity|fraud|waste and abuse|payment integrity,0.90,Program and payment integrity
+care_management,capability,related,care management|population health|managed care|case management,0.75,Care and population-health management
+medicaid_advisory,capability,related,medicaid|cms|chip|waiver|state plan amendment,0.60,Medicaid program domain
+health_it,capability,generic,health information technology|health it|system modernization|digital transformation,0.50,General health technology
