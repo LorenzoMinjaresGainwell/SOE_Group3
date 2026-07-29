@@ -39,7 +39,9 @@ const state = {
   focusRequests: { rht: null, competitors: null },
   competitorSelection: "gainwell",
   competitorSelections: [],
-  competitorQuery: "",
+  customCompetitorNames: [],
+  customCompetitorResults: {},
+  customCompetitorSearchOpen: false,
   rhtFamily: "opportunities",
   focusSelected: { rht: null, competitors: null },
   rhtOnly: false,
@@ -110,6 +112,13 @@ function parseDate(value) {
 function formatDate(value, fallback = "Not provided") {
   const date = parseDate(value);
   return date ? date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : fallback;
+}
+
+function formatTableDate(value, fallback = "Not provided") {
+  const date = parseDate(value);
+  if (!date) return escapeHtml(fallback);
+  const monthDay = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `<span class="table-date"><span>${escapeHtml(monthDay)},</span><span>${escapeHtml(date.getFullYear())}</span></span>`;
 }
 
 function formatDateTime(value) {
@@ -350,7 +359,7 @@ function renderRow(item, family, selected) {
   const commonStart = `<tr tabindex="0" data-id="${id}" class="${selectedClass}" aria-selected="${selected}">`;
   if (family === "opportunities") return `${commonStart}
     <td><div class="title-cell"><strong>${title}</strong>${item.pinned ? '<span class="pinned-label">Pinned</span>' : ""}<span>${escapeHtml(item.agency || item.source || "Agency not provided")}</span></div></td>
-    <td>${escapeHtml(jurisdictionLabel(item, family))}</td><td>${formatDate(item.due_date, "No due date")}</td>
+    <td>${escapeHtml(jurisdictionLabel(item, family))}</td><td>${formatTableDate(item.due_date, "No due date")}</td>
     <td>${priorityBadge(item)}</td><td><span class="badge ${badgeClass(item.status)}">${escapeHtml(item.status || "Unreviewed")}</span></td></tr>`;
   if (family === "contracts") {
     const lifecycle = lifecycleOf(item);
@@ -358,7 +367,7 @@ function renderRow(item, family, selected) {
     const value = Number(item.predictive_value_usd || item.potential_total_value || item.current_total_value || item.amount || item.award_amount || 0);
     return `${commonStart}<td><div class="title-cell"><strong>${title}</strong><span>${escapeHtml(item.vendor_name || item.recipient_name || "Incumbent not provided")}</span></div></td>
       <td>${escapeHtml(item.agency || item.subagency || "Not provided")}</td><td>${escapeHtml(jurisdictionLabel(item, family))}</td>
-      <td><span class="badge ${badgeClass(lifecycle)}">${escapeHtml(humanize(lifecycle))}</span></td><td>${formatDate(end, "Unknown")}</td>
+      <td><span class="badge ${badgeClass(lifecycle)}">${escapeHtml(humanize(lifecycle))}</span></td><td>${formatTableDate(end, "Unknown")}</td>
       <td>${value ? escapeHtml(money.format(value)) : "Not provided"}</td><td>${priorityBadge(item)}</td></tr>`;
   }
   const type = item.record_type || item.update_type || item.type || "update";
@@ -366,8 +375,8 @@ function renderRow(item, family, selected) {
   const action = item.action_required_by || item.due_date || item.effective_date;
   return `${commonStart}<td><div class="title-cell"><strong>${title}</strong><span>${escapeHtml(item.agency || item.source_key || "Agency not provided")}</span></div></td>
     <td>${escapeHtml(jurisdictionLabel(item, family))}</td><td><span class="badge badge-type">${escapeHtml(humanize(type))}</span></td>
-    <td>${rht ? '<span class="badge badge-rht">RHT</span>' : '<span class="muted">—</span>'}</td><td>${formatDate(item.posted_date || item.updated_date)}</td>
-    <td class="action-date ${action ? "has-action" : ""}">${formatDate(action, "No action date")}</td><td>${priorityBadge(item)}</td></tr>`;
+    <td>${rht ? '<span class="badge badge-rht">RHT</span>' : '<span class="muted">—</span>'}</td><td>${formatTableDate(item.posted_date || item.updated_date)}</td>
+    <td class="action-date ${action ? "has-action" : ""}">${formatTableDate(action, "No action date")}</td><td>${priorityBadge(item)}</td></tr>`;
 }
 
 function priorityBadge(item) {
@@ -492,8 +501,8 @@ function showDetail(item, family) {
   });
 }
 
-function detailHeader(item, family, badges = "") {
-  return `<div class="detail-header">${badges}<p class="detail-type">${escapeHtml(FAMILIES[family].kicker)}</p><h2>${escapeHtml(itemTitle(item, family))}</h2><p>${escapeHtml(item.agency || item.subagency || item.source || "Agency not provided")}</p></div>`;
+function detailHeader(item, family, badges = "", typeLabel = "") {
+  return `<div class="detail-header">${badges}<p class="detail-type">${escapeHtml(typeLabel || FAMILIES[family].kicker)}</p><h2>${escapeHtml(itemTitle(item, family))}</h2><p>${escapeHtml(item.agency || item.subagency || item.source || "Agency not provided")}</p></div>`;
 }
 
 function prioritySummary(item, family) {
@@ -596,8 +605,7 @@ function isRhtRecord(item) {
 async function loadFocus(view, force = false) {
   if (!force && state.focusCache[view]) return state.focusCache[view];
   if (state.focusRequests[view]) return state.focusRequests[view];
-  const query = view === "competitors" && state.competitorQuery.trim() ? `?q=${encodeURIComponent(state.competitorQuery.trim())}` : "";
-  const paths = [view === "rht" ? "/api/rht-overview" : `/api/competitors${query}`];
+  const paths = [view === "rht" ? "/api/rht-overview" : "/api/competitors"];
   const request = (async () => {
     let lastError;
     for (const path of paths) {
@@ -668,23 +676,23 @@ function focusRecordRow(item, family, selectedId = "") {
   </button></li>`;
 }
 
-function focusRecordDetail(item, family) {
+function focusRecordDetail(item, family, typeLabel = "") {
   if (!item) return '<p class="muted">Select a record to review details.</p>';
   const timing = item.due_date || item.potential_end_date || item.end_date || item.period_end_date || item.action_required_by;
   const value = item.predictive_value_usd || item.potential_total_value || item.current_total_value || item.award_amount || item.amount || item.budget_estimate;
-  return `${detailHeader(item, family, priorityScore(item) == null ? "" : scoreBadge(priorityScore(item), `Priority ${scoreDisplay(priorityScore(item))}`))}
+  return `${detailHeader(item, family, priorityScore(item) == null ? "" : scoreBadge(priorityScore(item), `Priority ${scoreDisplay(priorityScore(item))}`), typeLabel)}
     <p class="summary">${escapeHtml(item.summary || item.description || "No summary provided.")}</p>
     <div class="field-grid">${detailField("Jurisdiction", jurisdictionLabel(item, family))}${detailField("Timing", timing, { date: true })}${detailField("Agency / incumbent", item.agency || item.vendor_name || item.recipient_name)}${detailField("Tracked value", value, { money: true })}</div>
     <div class="focus-detail-actions"><button type="button" data-open-family="${escapeHtml(family)}" data-focus-id="${escapeHtml(recordId(item, family))}">Open in Family Records</button>${sourceLink(item)}</div>`;
 }
 
-function focusWorkspace(records, view, title, description = "") {
+function focusWorkspace(records, view, title, description = "", controls = "", detailLabel = "") {
   const selectedKey = state.focusSelected[view];
   let selected = records.find((item) => `${focusFamilyOf(item)}:${recordId(item, focusFamilyOf(item))}` === selectedKey) || records[0];
   if (selected) state.focusSelected[view] = `${focusFamilyOf(selected)}:${recordId(selected, focusFamilyOf(selected))}`;
   const family = selected ? focusFamilyOf(selected) : "opportunities";
   const selectedId = selected ? recordId(selected, family) : "";
-  return `<div class="focus-workspace"><section class="focus-section focus-results"><div><div><h3>${escapeHtml(title)}</h3>${description ? `<p>${escapeHtml(description)}</p>` : ""}</div><span>${number.format(records.length)} shown</span></div><ul>${records.length ? records.map((item) => focusRecordRow(item, focusFamilyOf(item), selectedId)).join("") : '<li class="muted">No collected records match this selection.</li>'}</ul></section><aside class="focus-section focus-detail">${focusRecordDetail(selected, family)}</aside></div>`;
+  return `<div class="focus-workspace ${view === "competitors" ? "competitor-workspace" : ""}"><section class="focus-section focus-results">${controls}<div class="focus-results-heading"><div><h3>${escapeHtml(title)}</h3>${description ? `<p>${escapeHtml(description)}</p>` : ""}</div><span>${number.format(records.length)} shown</span></div><ul>${records.length ? records.map((item) => focusRecordRow(item, focusFamilyOf(item), selectedId)).join("") : '<li class="muted">No collected records match this selection.</li>'}</ul></section><aside class="focus-section focus-detail">${focusRecordDetail(selected, family, detailLabel)}</aside></div>`;
 }
 
 function renderRhtFocus(payload) {
@@ -700,26 +708,35 @@ function renderRhtFocus(payload) {
     ${focusWorkspace(activeRecords.map((item) => ({ ...item, family: state.rhtFamily })), "rht", FAMILIES[state.rhtFamily].title, "Rural Health Transformation signals across opportunities, contracts, and policy updates.")}`;
 }
 
-let competitorSearchTimer;
 const COMPETITOR_OPTIONS = [
   ["maximus", "MAXIMUS"], ["deloitte", "Deloitte"], ["accenture", "Accenture"], ["optum", "Optum"],
   ["conduent", "Conduent"], ["acentra", "Acentra"], ["pcg", "PCG"], ["cgi", "CGI"],
 ];
 
 function competitorRecords(payload) {
-  if (state.competitorSelection === "search") return Array.isArray(payload.search?.records) ? payload.search.records : [];
   const profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
   const selected = state.competitorSelection === "competitors"
     ? profiles.filter((profile) => profile.organization_type === "competitor")
     : state.competitorSelection === "custom"
       ? profiles.filter((profile) => state.competitorSelections.includes(profile.organization_key))
       : profiles.filter((profile) => profile.organization_key === state.competitorSelection);
-  return selected.flatMap((profile) => (profile.top_records || []).map((record) => ({
+  const configured = selected.flatMap((profile) => (profile.top_records || []).map((record) => ({
     ...record,
     organization_key: profile.organization_key,
     organization_name: profile.organization_name,
     organization_type: profile.organization_type,
   })));
+  const custom = state.competitorSelection === "custom"
+    ? state.customCompetitorNames.flatMap((name) => state.customCompetitorResults[name] || [])
+    : [];
+  const seen = new Set();
+  return [...configured, ...custom].filter((record) => {
+    const family = focusFamilyOf(record);
+    const key = `${family}:${recordId(record, family)}`;
+    if (!recordId(record, family) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function competitorSummary(records) {
@@ -738,11 +755,49 @@ function competitorSummary(records) {
 
 function renderCompetitorFocus(payload) {
   const records = competitorRecords(payload);
-  const topSelection = ["gainwell", "competitors", "search"].includes(state.competitorSelection) ? state.competitorSelection : "";
+  const topSelection = state.competitorSelection === "gainwell" ? "gainwell" : "competitors";
+  const customChips = state.customCompetitorNames.length ? `<div class="custom-competitor-chips" aria-label="Custom competitor filters">${state.customCompetitorNames.map((name) => `<button type="button" data-remove-custom-competitor="${escapeHtml(name)}" aria-label="Remove ${escapeHtml(name)}">${escapeHtml(name)} <span aria-hidden="true">×</span></button>`).join("")}</div>` : "";
+  const controls = topSelection === "competitors" ? `<div class="competitor-tools"><div class="competitor-filter-row"><div class="competitor-controls compact-controls" role="group" aria-label="Specific competitors">${COMPETITOR_OPTIONS.map(([key, label]) => `<button type="button" class="competitor-option ${state.competitorSelections.includes(key) ? "active" : ""}" data-competitor-toggle="${key}" aria-pressed="${state.competitorSelections.includes(key)}">${escapeHtml(label)}</button>`).join("")}<button type="button" class="competitor-option custom-search-toggle ${state.customCompetitorSearchOpen ? "active" : ""}" data-toggle-custom-competitor-search aria-expanded="${state.customCompetitorSearchOpen}">Custom Search</button></div><button type="button" class="competitor-option" data-clear-competitors>Clear</button></div>${state.customCompetitorSearchOpen ? `<div class="custom-competitor-search"><label for="customCompetitorInput">Enter competitor names separated by commas</label><div><input id="customCompetitorInput" data-custom-competitor-input placeholder="e.g., Molina, Elevance, Centene" autocomplete="off"><button type="button" class="competitor-option" data-apply-custom-competitors>Apply</button></div></div>` : ""}${customChips}</div>` : "";
   els.focusView.innerHTML = `
-    <div class="primary-tabs focus-primary-tabs competitor-primary" role="tablist" aria-label="Intelligence scope">${[["gainwell", "Gainwell"], ["competitors", "All competitors"], ["search", "Search"]].map(([key, label]) => `<button type="button" role="tab" class="primary-tab ${key === topSelection ? "active" : ""}" data-competitor="${key}" aria-selected="${key === topSelection}">${label}</button>`).join("")}</div>
-    <div class="focus-content-shell">${state.competitorSelection !== "search" ? `<div class="competitor-filter-row"><div class="competitor-controls compact-controls" role="group" aria-label="Specific competitors">${COMPETITOR_OPTIONS.map(([key, label]) => `<button type="button" class="competitor-option ${state.competitorSelections.includes(key) ? "active" : ""}" data-competitor-toggle="${key}" aria-pressed="${state.competitorSelections.includes(key)}">${escapeHtml(label)}</button>`).join("")}</div><button type="button" class="secondary-button" data-clear-competitors>Clear</button></div>` : `<div class="focus-search-row"><input type="search" aria-label="Search collected records" data-competitor-search value="${escapeHtml(state.competitorQuery)}" placeholder="Search by title, agency, vendor, or topic" autocomplete="off"><button type="button" class="secondary-button" data-clear-competitor-search>Clear</button></div>`}
-    ${focusWorkspace(records, "competitors", "Matching records")}</div>`;
+    <div class="primary-tabs focus-primary-tabs competitor-primary" role="tablist" aria-label="Intelligence scope">${[["gainwell", "Gainwell"], ["competitors", "Competitors"]].map(([key, label]) => `<button type="button" role="tab" class="primary-tab ${key === topSelection ? "active" : ""}" data-competitor="${key}" aria-selected="${key === topSelection}">${label}</button>`).join("")}</div>
+    ${focusWorkspace(records, "competitors", "Matching records", "", controls, "Market intelligence")}`;
+}
+
+async function applyCustomCompetitorSearch() {
+  const input = els.focusView.querySelector("[data-custom-competitor-input]");
+  const requested = [...new Set(String(input?.value || "").split(",").map((name) => name.trim()).filter(Boolean))];
+  if (!requested.length) { input?.focus(); return; }
+  const applyButton = els.focusView.querySelector("[data-apply-custom-competitors]");
+  if (applyButton) { applyButton.disabled = true; applyButton.textContent = "Searching…"; }
+  try {
+    const payloads = await Promise.all(requested.map((name) => api(`/api/competitors?q=${encodeURIComponent(name)}&limit=50`)));
+    requested.forEach((name, index) => {
+      state.customCompetitorResults[name] = Array.isArray(payloads[index]?.search?.records) ? payloads[index].search.records : [];
+    });
+    state.customCompetitorNames = [...new Set([...state.customCompetitorNames, ...requested])];
+    state.competitorSelection = "custom";
+    state.focusSelected.competitors = null;
+    renderCompetitorFocus(state.focusCache.competitors || {});
+  } catch (error) {
+    showNotice(`Competitor search failed: ${error.message}`, "error");
+    if (applyButton) { applyButton.disabled = false; applyButton.textContent = "Apply"; }
+  }
+}
+
+function familyFilterDefaults(family, revealAnyRecord = false) {
+  if (family === "opportunities") return { status: "", score: "0" };
+  if (family === "contracts") return { lifecycle: revealAnyRecord ? "all" : "current", score: "0" };
+  return { type: "", rht: "", action: "" };
+}
+
+function revealFamilyRecord(id) {
+  if (!id) return false;
+  const row = [...els.rows.querySelectorAll("tr[data-id]")].find((candidate) => candidate.dataset.id === id);
+  if (!row) return false;
+  row.focus({ preventScroll: true });
+  row.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  els.detail.scrollTo({ top: 0, behavior: "smooth" });
+  return true;
 }
 
 function openFamilyRecords(family, id = "", rhtOnly = false) {
@@ -751,6 +806,16 @@ function openFamilyRecords(family, id = "", rhtOnly = false) {
   if (id) state.selected[family] = id;
   switchView("records");
   switchFamily(family).then(() => {
+    if (id && !revealFamilyRecord(id)) {
+      els.search.value = "";
+      els.jurisdiction.value = "";
+      state.rhtOnly = false;
+      state.filters[family] = familyFilterDefaults(family, true);
+      state.selected[family] = id;
+      renderFamilyFilters();
+      renderActiveFamily();
+    }
+    requestAnimationFrame(() => requestAnimationFrame(() => revealFamilyRecord(id)));
     if (rhtOnly) showNotice(`Showing Rural Health Transformation records in ${FAMILIES[family].title}.`, "success");
   });
 }
@@ -829,21 +894,54 @@ els.focusTabs.addEventListener("click", (event) => {
 els.focusView.addEventListener("click", (event) => {
   const retry = event.target.closest("[data-focus-retry]");
   if (retry) { switchView(retry.dataset.focusRetry, true); return; }
-  const clearSearch = event.target.closest("[data-clear-competitor-search]");
-  if (clearSearch) { state.competitorQuery = ""; renderCompetitorFocus(state.focusCache.competitors || {}); els.focusView.querySelector("[data-competitor-search]")?.focus(); return; }
   const clearCompetitors = event.target.closest("[data-clear-competitors]");
-  if (clearCompetitors) { state.competitorSelections = []; state.competitorSelection = "custom"; renderCompetitorFocus(state.focusCache.competitors || {}); return; }
+  if (clearCompetitors) {
+    state.competitorSelections = [];
+    state.customCompetitorNames = [];
+    state.customCompetitorResults = {};
+    state.competitorSelection = "competitors";
+    state.focusSelected.competitors = null;
+    renderCompetitorFocus(state.focusCache.competitors || {});
+    return;
+  }
+  const toggleCustomSearch = event.target.closest("[data-toggle-custom-competitor-search]");
+  if (toggleCustomSearch) {
+    state.customCompetitorSearchOpen = !state.customCompetitorSearchOpen;
+    renderCompetitorFocus(state.focusCache.competitors || {});
+    els.focusView.querySelector("[data-custom-competitor-input]")?.focus();
+    return;
+  }
+  const applyCustom = event.target.closest("[data-apply-custom-competitors]");
+  if (applyCustom) { applyCustomCompetitorSearch(); return; }
+  const removeCustom = event.target.closest("[data-remove-custom-competitor]");
+  if (removeCustom) {
+    const name = removeCustom.dataset.removeCustomCompetitor;
+    state.customCompetitorNames = state.customCompetitorNames.filter((item) => item !== name);
+    delete state.customCompetitorResults[name];
+    if (!state.customCompetitorNames.length && !state.competitorSelections.length) state.competitorSelection = "competitors";
+    state.focusSelected.competitors = null;
+    renderCompetitorFocus(state.focusCache.competitors || {});
+    return;
+  }
   const competitorToggle = event.target.closest("[data-competitor-toggle]");
   if (competitorToggle) {
     const key = competitorToggle.dataset.competitorToggle;
     state.competitorSelections = state.competitorSelections.includes(key) ? state.competitorSelections.filter((item) => item !== key) : [...state.competitorSelections, key];
-    state.competitorSelection = "custom";
+    state.competitorSelection = state.competitorSelections.length || state.customCompetitorNames.length ? "custom" : "competitors";
     state.focusSelected.competitors = null;
     renderCompetitorFocus(state.focusCache.competitors || {});
     return;
   }
   const competitor = event.target.closest("[data-competitor]");
-  if (competitor) { state.competitorSelection = competitor.dataset.competitor; if (competitor.dataset.competitor !== "search") state.competitorSelections = []; renderCompetitorFocus(state.focusCache.competitors || {}); return; }
+  if (competitor) {
+    state.competitorSelection = competitor.dataset.competitor;
+    state.competitorSelections = [];
+    state.customCompetitorNames = [];
+    state.customCompetitorResults = {};
+    state.focusSelected.competitors = null;
+    renderCompetitorFocus(state.focusCache.competitors || {});
+    return;
+  }
   const rhtFamily = event.target.closest("[data-rht-family]");
   if (rhtFamily) { state.rhtFamily = rhtFamily.dataset.rhtFamily; state.focusSelected.rht = null; renderRhtFocus(state.focusCache.rht || {}); return; }
   const openRecord = event.target.closest("[data-open-family]");
@@ -858,24 +956,11 @@ els.focusView.addEventListener("click", (event) => {
   const record = event.target.closest("[data-focus-family]");
   if (record) openFamilyRecords(record.dataset.focusFamily, record.dataset.focusId || "", record.dataset.rhtFilter === "true");
 });
-els.focusView.addEventListener("input", (event) => {
-  if (!event.target.matches("[data-competitor-search]")) return;
-  state.competitorQuery = event.target.value;
-  clearTimeout(competitorSearchTimer);
-  competitorSearchTimer = setTimeout(async () => {
-    const query = state.competitorQuery.trim();
-    try {
-      const payload = await api(`/api/competitors${query ? `?q=${encodeURIComponent(query)}` : ""}`);
-      if (state.activeView !== "competitors" || query !== state.competitorQuery.trim()) return;
-      state.focusCache.competitors = payload;
-      renderCompetitorFocus(payload);
-      const input = els.focusView.querySelector("[data-competitor-search]");
-      input?.focus();
-      input?.setSelectionRange(state.competitorQuery.length, state.competitorQuery.length);
-    } catch (error) {
-      showNotice(`Competitor search failed: ${error.message}`, "error");
-    }
-  }, 250);
+els.focusView.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && event.target.matches("[data-custom-competitor-input]")) {
+    event.preventDefault();
+    applyCustomCompetitorSearch();
+  }
 });
 
 switchFamily("opportunities");

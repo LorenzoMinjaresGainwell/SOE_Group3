@@ -319,7 +319,7 @@ class DashboardRouteTests(DashboardFamilyTests):
         self.assertIn('"/api/rht-overview"', frontend)
         self.assertIn("payload.top_records", frontend)
         self.assertIn("payload.profiles", frontend)
-        self.assertIn("payload.search?.records", frontend)
+        self.assertIn("search?.records", frontend)
         self.assertIn("?q=${encodeURIComponent", frontend)
         self.assertIn("item.confidence", frontend)
         self.assertIn("item.recommended_action", frontend)
@@ -327,7 +327,9 @@ class DashboardRouteTests(DashboardFamilyTests):
         self.assertIn("dimension.missing_notes", frontend)
         self.assertNotIn("/api/focus/rht", frontend)
         self.assertLess(frontend.index('[\"gainwell\", \"Gainwell\"]'),
-                        frontend.index('[\"competitors\", \"All competitors\"]'))
+                        frontend.index('[\"competitors\", \"Competitors\"]'))
+        self.assertIn("data-toggle-custom-competitor-search", frontend)
+        self.assertIn("split(\",\")", frontend)
 
     def test_status_and_pin_routes_are_opportunity_only(self):
         status, opportunity = self.request(
