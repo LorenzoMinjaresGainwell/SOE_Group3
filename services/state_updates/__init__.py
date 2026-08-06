@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
-import importlib
 import json
 import re
 from typing import Any, Callable
@@ -309,75 +308,7 @@ def emit(progress: Callable[[str], None] | None, message: str) -> None:
         progress(message)
 
 
-from . import il as il_updates  # noqa: E402
-from . import mi as mi_updates  # noqa: E402
-from . import nj as nj_updates  # noqa: E402
 
-STATE_CLIENTS.update(
-    {
-        "IL": il_updates.fetch_updates,
-        "MI": mi_updates.fetch_updates,
-        "NJ": nj_updates.fetch_updates,
-    }
-)
+from services.state_collector_registry import load_state_collectors  # noqa: E402
 
-
-from services.state_updates import pa, tx  # noqa: E402
-
-STATE_CLIENTS.update(
-    {
-        "PA": pa.fetch_updates,
-        "TX": tx.fetch_updates,
-    }
-)
-
-def _register_state_clients() -> None:
-    for state_code, module_name in {
-        "AK": "ak",
-        "AL": "al",
-        "AR": "ar",
-        "AZ": "az",
-        "CA": "ca",
-        "CO": "co",
-        "CT": "ct",
-        "DC": "dc",
-        "FL": "fl",
-        "GA": "ga",
-        "HI": "hi",
-        "IA": "ia",
-        "ID": "id",
-        "IN": "in",
-        "KY": "ky",
-        "LA": "la",
-        "MD": "md",
-        "ME": "me",
-        "MO": "mo",
-        "MP": "mp",
-        "MS": "ms",
-        "MT": "mt",
-        "NC": "nc",
-        "ND": "nd",
-        "NE": "ne",
-        "NM": "nm",
-        "NV": "nv",
-        "NY": "ny",
-        "OK": "ok",
-        "OR": "or",
-        "PR": "pr",
-        "RI": "ri",
-        "SC": "sc",
-        "SD": "sd",
-        "TN": "tn",
-        "UT": "ut",
-        "VA": "va",
-        "VI": "vi",
-        "VT": "vt",
-        "WA": "wa",
-        "WV": "wv",
-        "WY": "wy",
-    }.items():
-        module = importlib.import_module(f"services.state_updates.{module_name}")
-        STATE_CLIENTS[state_code] = module.fetch_updates
-
-
-_register_state_clients()
+STATE_CLIENTS = load_state_collectors("updates")

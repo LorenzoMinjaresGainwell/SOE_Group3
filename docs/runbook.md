@@ -247,120 +247,202 @@ Key flags:
 
 ## State Callers
 
-State outputs are organized by data type:
-
-```text
-data/state_contracts.csv        awarded contracts and incumbent/recompete signals
-data/state_opportunities.csv    RFPs, bids, awards, and funding opportunities
-```
-
-Supported state keys currently include:
-
-```text
-PA
-TX
-```
-
-### State Contracts
-
-Run configured Gainwell-style terms:
-
-```bash
-./scripts/state_contracts.py --states PA,TX --vendor-group "Gainwell Technologies" --max-per-vendor 100
-```
-
-Run direct vendor terms:
-
-```bash
-./scripts/state_contracts.py --states PA,TX --vendors "Gainwell,DXC,HMS,Health Management Systems,MAXIMUS" --max-per-vendor 100
-```
-
-Run one state:
-
-```bash
-./scripts/state_contracts.py --states PA --vendor-group "Gainwell Technologies" --max-per-vendor 100
-```
-
-Key flags:
-
-```text
---states CSV              state abbreviations
---vendors CSV             direct vendor search terms
---vendor-group CSV        configured vendor groups and aliases
---keywords CSV            scoring/matching keywords
---max-per-vendor N        max records per vendor term
---params PATH             config file
---out PATH                output CSV
---dry-run                 no CSV write
---json                    JSON summary
-```
-
-Notes:
-
-```text
-PA uses OpenBookPA contracts.
-TX uses TXSmartBuy contracts.
-Far-future PA dates like 2099-12-31 are treated as placeholders.
-PA rows distinguish parent contracts from amendments.
-```
+State and territory adapters are selected explicitly with comma-separated postal abbreviations passed to `--states`. The special tag `--states all` runs every active adapter in that family; `--all` is an equivalent shorthand. Do not combine `all` with other tags. There are no default states. Active tags and module mappings are loaded at runtime from `data/state_collectors.json`; unknown or unregistered tags are rejected before collection. Use `--dry-run` before writing snapshots. A registered adapter can return zero qualifying records, and official portals can still be temporarily unavailable.
 
 ### State Opportunities
 
-Run PA/TX opportunity sources:
-
-```bash
-./scripts/state_opportunities.py --states PA,TX --max-records 100
-```
-
-Run with focused keywords:
-
-```bash
-./scripts/state_opportunities.py --states PA,TX --keywords "Medicaid,MMIS,eligibility,claims,rural health" --max-records 100
-```
-
-Run one state:
-
-```bash
-./scripts/state_opportunities.py --states PA --max-records 100
-```
-
-Key flags:
+Output:
 
 ```text
---states CSV              state abbreviations
---keywords CSV            opportunity keywords
---days-back N             recent award window
---max-records N           max records written
---params PATH             config file
---out PATH                output CSV
---dry-run                 no CSV write
---json                    JSON summary
+data/state_opportunities.csv
 ```
 
-Notes:
+Dry-run selected jurisdictions:
 
-```text
-PA uses eMarketplace and DHS Rural Health Transformation pages.
-TX uses ESBD.
-Strict filtering can return zero rows when only unrelated matches are found.
+```bash
+python scripts/state_opportunities.py \
+  --states IL,MA,NJ,OR,AR,NV,VI \
+  --keywords "Medicaid,MMIS,eligibility,claims,rural health" \
+  --days-back 90 \
+  --max-records 25 \
+  --dry-run
 ```
 
-## Config
-
-Main config:
+Active tags (48):
 
 ```text
+AK,AL,AR,AZ,CA,CO,DC,DE,FL,GA,HI,IA,ID,IL,IN,KS,KY,LA,
+MA,MD,ME,MI,MO,MS,MT,NC,NE,NJ,NM,NV,NY,OK,OR,PA,PR,RI,
+SC,SD,TN,TX,UT,VA,VI,VT,WA,WI,WV,WY
+```
+
+Flags:
+
+```text
+--states CSV              configured abbreviations or the special tag all (no default)
+--all                     shorthand for --states all; runs all 48 opportunity collectors
+--keywords CSV            defaults to the shared business taxonomy
+--days-back N             recent record window; future-due records are retained
+--max-records N           maximum normalized results
+--params PATH             default data/search_parameters.json
+--out PATH                default data/state_opportunities.csv
+--dry-run                 call and normalize without writing
+--json                    print a machine-readable summary
+```
+
+A lightweight static-HTML check:
+
+```bash
+python scripts/state_opportunities.py --states NE --max-records 10 --dry-run
+```
+
+A shared BSO/BuySpeed adapter check:
+
+```bash
+python scripts/state_opportunities.py --states IL --max-records 10 --dry-run
+```
+
+### State Contracts and Potential Recompetes
+
+Output:
+
+```text
+data/state_contracts.csv
+```
+
+Contract callers require direct vendor terms or configured vendor groups:
+
+```bash
+python scripts/state_contracts.py \
+  --states AR,IL,MA,NJ,OR \
+  --vendor-group "Gainwell Technologies" \
+  --max-per-vendor 25 \
+  --dry-run
+```
+
+Direct vendor terms:
+
+```bash
+python scripts/state_contracts.py \
+  --states PA,TX \
+  --vendors "Gainwell,DXC,HMS,Health Management Systems,MAXIMUS" \
+  --max-per-vendor 25 \
+  --dry-run
+```
+
+Active tags (34):
+
+```text
+AK,AL,AR,AZ,CA,CO,DC,DE,FL,GA,IA,ID,IL,IN,LA,MA,MD,MI,
+MO,NC,NJ,NY,OK,OR,PA,PR,TN,TX,UT,VA,VT,WA,WV,WY
+```
+
+Flags:
+
+```text
+--states CSV              configured abbreviations or the special tag all (no default)
+--all                     shorthand for --states all; runs all 34 contract collectors
+--vendors CSV             direct vendor search terms
+--vendor-group CSV        configured vendor groups with aliases
+--keywords CSV            defaults to the shared business taxonomy
+--max-per-vendor N        maximum records per vendor term
+--params PATH             default data/search_parameters.json
+--out PATH                default data/state_contracts.csv
+--dry-run                 call and normalize without writing
+--json                    print a machine-readable summary
+```
+
+Contract end dates produce planning signals rather than confirmed future solicitations. Unknown and far-future placeholder dates are treated neutrally.
+
+### State Medicaid, Medicare, CMS, and RHT Updates
+
+Output:
+
+```text
+data/state_policy_updates.csv
+```
+
+```bash
+python scripts/state_updates.py \
+  --states CA,FL,NJ,PA,PR,TX,VI \
+  --max-records 50 \
+  --dry-run
+```
+
+Active tags (47):
+
+```text
+AK,AL,AR,AZ,CA,CO,CT,DC,FL,GA,HI,IA,ID,IL,IN,KY,LA,MD,
+ME,MI,MO,MP,MS,MT,NC,ND,NE,NJ,NM,NV,NY,OK,OR,PA,PR,RI,
+SC,SD,TN,TX,UT,VA,VI,VT,WA,WV,WY
+```
+
+Flags:
+
+```text
+--states CSV              configured abbreviations or the special tag all (no default)
+--all                     shorthand for --states all; runs all 47 update collectors
+--keywords CSV            defaults to the shared business taxonomy
+--max-records N           maximum normalized results across selected sources
+--params PATH             default data/search_parameters.json
+--out PATH                default data/state_policy_updates.csv
+--dry-run                 call and normalize without writing
+--json                    print a machine-readable summary
+```
+
+## Derived Federal Datasets
+
+After refreshing federal source CSVs, rebuild the files consumed by the canonical contract and update families:
+
+```bash
+python scripts/build_contract_lifecycle.py
+python scripts/build_federal_update_catalog.py
+```
+
+The lifecycle builder reads `data/contracts.csv` and writes `data/federal_contract_lifecycle.csv`. The update builder combines Federal Register, Regulations.gov, grants, opportunities, CMS, and Medicaid source snapshots into `data/federal_updates_catalog.csv` while preserving family separation.
+
+## Recommended Refresh Sequence
+
+```bash
+# 1. Dry-run the selected federal and state callers.
+python scripts/run_gov_search.py --mode continue --sources grants,federal_register,medicaid,cms_provider,usaspending --max-per-source 25 --dry-run
+python scripts/state_opportunities.py --states all --max-records 100 --dry-run
+python scripts/state_contracts.py --states all --vendor-group "Gainwell Technologies" --max-per-vendor 25 --dry-run
+python scripts/state_updates.py --states all --max-records 300 --dry-run
+
+# 2. Repeat approved commands without --dry-run to update snapshots.
+
+# 3. Rebuild derived federal datasets.
+python scripts/build_contract_lifecycle.py
+python scripts/build_federal_update_catalog.py
+
+# 4. Validate before starting the dashboard.
+python -m unittest discover -s tests -q
+python -m compileall -q app.py services scripts
+node --check static/app.js
+node --check static/federal-records.js
+```
+
+Use `--states` instead of `--all` to run a comma-separated subset from the relevant family list. Running every active source can take time and remains dependent on external portal availability.
+
+## Configuration
+
+Runtime state collector registry and main search configuration:
+
+```text
+data/state_collectors.json
 data/search_parameters.json
 ```
 
-Common sections:
+`data/state_collectors.json` is the runtime source of active state/territory tags and maps each tag to its module under `services/state_<family>/`.
+
+Shared and family-specific configuration:
 
 ```text
-monitored_keywords
-vendors
-usaspending
-state_contracts
-state_sources
+services/search_taxonomy.py
+data/competitor_aliases.csv
+data/capability_rules.csv
+data/strategic_jurisdictions.csv
 ```
 
 Template secrets file:
@@ -377,13 +459,19 @@ Local secrets file:
 
 Do not commit `.env`.
 
-## Generated CSVs
+## Generated and Canonical CSVs
 
 ```text
 data/contracts.csv
-data/state_contracts.csv
-data/state_opportunities.csv
+data/federal_contract_lifecycle.csv
+data/federal_opportunities.csv
+data/federal_grants.csv
 data/federal_register_updates.csv
 data/regulations_updates.csv
 data/cms_provider_data.csv
+data/medicaid_data.csv
+data/federal_updates_catalog.csv
+data/state_contracts.csv
+data/state_opportunities.csv
+data/state_policy_updates.csv
 ```

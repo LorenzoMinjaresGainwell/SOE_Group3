@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from services.state_collector_registry import select_state_tags  # noqa: E402
 from services.state_contracts import fetch_state_contracts  # noqa: E402
 from services.search_taxonomy import load_search_parameters, load_search_taxonomy, ordered_dedupe  # noqa: E402
 from services.state_contracts.store import upsert_state_contracts  # noqa: E402
@@ -48,7 +49,9 @@ def configured_vendor_terms(params: dict, groups: list[str]) -> list[str]:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Fetch state contract records.")
-    parser.add_argument("--states", default="PA", help="comma list of state abbreviations")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument("--states", help="comma list of configured state abbreviations, or 'all'")
+    selection.add_argument("--all", action="store_true", help="run all configured contract collectors")
     parser.add_argument("--params", default="data/search_parameters.json")
     parser.add_argument("--out", default="data/state_contracts.csv")
     parser.add_argument("--vendors", default="", help="comma list of direct vendor search terms")
@@ -62,6 +65,15 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    if not args.states and not args.all:
+        print("Specify --states CSV or --all.", file=sys.stderr)
+        return 2
+    try:
+        states = select_state_tags("contracts", args.states, args.all)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+
     params = load_search_parameters(ROOT / args.params)
     vendor_terms = split_csv(args.vendors)
     if not vendor_terms:
@@ -71,7 +83,6 @@ def main() -> int:
         return 2
 
     keywords = split_csv(args.keywords) or load_search_taxonomy(ROOT / args.params).business_terms
-    states = split_csv(args.states)
 
     print(
         f"State contracts: states={','.join(states)} vendor_terms={len(vendor_terms)} "
