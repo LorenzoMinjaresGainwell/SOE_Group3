@@ -7,3 +7,6 @@ __pycache__/
 *.log
 data/raw/sam/
 data/raw/state_contracts/tx_dir/
+coord/
+data/opportunity_user_state.csv
+data/status_history.csv
